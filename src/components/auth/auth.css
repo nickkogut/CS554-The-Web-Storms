@@ -1,0 +1,63 @@
+/* === Firebase Auth Forms and Buttons === */
+.auth-form {
+    width: 50%;
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: 15px;
+    align-items: center;
+    border: 2px solid gray;
+    border-radius: 8px;
+    padding: 15px;
+}
+
+.auth-form input {
+    width: 85%;
+    padding: 6px;
+    border: 1px solid lightgray;
+    border-radius: 4px;
+    box-sizing: border-box;
+}
+
+.auth-form input[type=number] {
+    width: 100px;
+}
+
+.btn-shelf {
+    grid-column: 1 / -1;
+    margin-top: 20px;
+    display: flex;
+    gap: 20px;
+    align-items: center;
+}
+
+.auth-btn {
+    padding: 8px;
+    border: 1px solid black;
+    border-radius: 8px;
+    color: black;
+}
+
+.auth-btn:hover {
+    background-color: lightgray;
+    cursor: pointer;
+    text-decoration: underline;
+}
+
+.auth-error {
+    grid-column: 1 / -1;
+    border: 1px solid red;
+    border-radius: 5px;
+    width: fit-content;
+    padding: 10px;
+}
+
+/* === Google Login === */
+#google-img {
+    width: 40px;
+    height: 40px;
+}
+
+#google-img:hover {
+    cursor: pointer;
+    filter: brightness(0.92);
+}
