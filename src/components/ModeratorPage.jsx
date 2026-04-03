@@ -140,7 +140,7 @@ export default function ModeratorPage({ onSend }) {
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                    query: mutation,   // 🔥 REQUIRED
+                    query: mutation,
                     variables: {
                         questions: payload
                     }
@@ -149,7 +149,6 @@ export default function ModeratorPage({ onSend }) {
 
             const result = await response.json();
 
-            // 🔴 Handle GraphQL errors
             if (result.errors) {
                 throw new Error(result.errors[0].message);
             }
@@ -169,51 +168,6 @@ export default function ModeratorPage({ onSend }) {
             setIsSubmitting(false);
         }
     };
-
-    // const buttonOnSend = async () => {
-    //     try {
-    //         setStatus({ type: 'info', message: '' });
-    //         validateQuestions();
-
-    //         const payload = {
-    //             questions: normalizeQuestions(questions),
-    //             createdAt: new Date().toISOString()
-    //         };
-
-    //         setIsSubmitting(true);
-
-    //         if (typeof onSend === 'function') {
-    //             await onSend(payload);
-    //         } else {
-    //             const response = await fetch(API_URL, {
-    //                 method: 'POST',
-    //                 headers: {
-    //                     'Content-Type': 'application/json'
-    //                 },
-    //                 body: JSON.stringify(payload)
-    //             });
-
-    //             if (!response.ok) {
-    //                 const text = await response.text();
-    //                 throw new Error(text || 'Failed to send questions.');
-    //             }
-    //         }
-
-    //         setStatus({
-    //             type: 'success',
-    //             message: 'Questions sent successfully.'
-    //         });
-
-    //         setQuestions([createBlankQuestion()]);
-    //     } catch (error) {
-    //         setStatus({
-    //             type: 'error',
-    //             message: error.message || 'Something went wrong.'
-    //         });
-    //     } finally {
-    //         setIsSubmitting(false);
-    //     }
-    // };
 
     return (
         <Box sx={{ minHeight: '100vh', bgcolor: '#f7f8fc' }}>
@@ -348,150 +302,3 @@ export default function ModeratorPage({ onSend }) {
         </Box>
     );
 }
-
-// import React, { useState } from 'react';
-
-// import AppBar from '@mui/material/AppBar';
-// import Box from '@mui/material/Box';
-// import TextField from '@mui/material/TextField';
-// import Divider from '@mui/material/Divider';
-// import Toolbar from '@mui/material/Toolbar';
-// import Typography from '@mui/material/Typography';
-// import IconButton from '@mui/material/IconButton';
-// import Button from '@mui/material/Button';
-// import Stack from '@mui/material/Stack';
-// import Grid from '@mui/material/Grid';
-
-// import AddIcon from '@mui/icons-material/Add';
-// import DeleteIcon from '@mui/icons-material/Delete';
-// import SendIcon from '@mui/icons-material/Send';
-// import MenuIcon from '@mui/icons-material/Menu';
-
-// export default function ModeratorPage() {
-
-//     const buttonDeleteQuestion = (question) => {
-//         alert("This question will be removed")
-//         handleRemove(question.id)
-//     }
-
-//     const buttonAddQuestion = () => {
-
-//     }
-
-//     const buttonOnSend = () => {
-
-//     };
-
-//     return (
-//         <div className="page">
-//             <AppBar position="sticky">
-//                 <Toolbar variant="dense">
-//                     <IconButton edge="start" color="inherit" aria-label="menu" sx={{ mr: 2 }}>
-//                         <MenuIcon />
-//                     </IconButton>
-//                     <Typography variant="h6" color="inherit" component="div">
-//                         Photos
-//                     </Typography>
-//                 </Toolbar>
-//             </AppBar>
-//             <Box
-//                 component="form"
-//                 sx={{ '& .MuiTextField-root': { m: 1, width: '90ch' } }}
-//                 noValidate
-//                 autoComplete="off"
-//             >
-//                 <div>
-//                     <TextField
-//                         id="outlined-multiline-flexible"
-//                         label="Question"
-//                         multiline
-//                         maxRows={4}
-//                     />
-//                 </div>
-//             </Box>
-//             <Grid container rowSpacing={1} columnSpacing={{ xs: 1, sm: 2, md: 3 }}>
-//                 {/* <Grid container spacing={4}> */}
-//                 <Grid size={6}>
-//                     <Box
-//                         component="form"
-//                         sx={{ '& .MuiTextField-root': { m: 1, width: '25ch' } }}
-//                         noValidate
-//                         autoComplete="off"
-//                     >
-//                         <div>
-//                             <TextField
-//                                 id="outlined-multiline-flexible"
-//                                 label="Option 1"
-//                                 multiline
-//                                 maxRows={4}
-//                             />
-//                         </div>
-//                     </Box>
-//                 </Grid>
-//                 <Grid size={6}>
-//                     <Box
-//                         component="form"
-//                         sx={{ '& .MuiTextField-root': { m: 1, width: '25ch' } }}
-//                         noValidate
-//                         autoComplete="off"
-//                     >
-//                         <div>
-//                             <TextField
-//                                 id="outlined-multiline-flexible"
-//                                 label="Option 2"
-//                                 multiline
-//                                 maxRows={4}
-//                             />
-//                         </div>
-//                     </Box>
-//                 </Grid>
-//                 <Grid size={6}>
-//                     <Box
-//                         component="form"
-//                         sx={{ '& .MuiTextField-root': { m: 1, width: '25ch' } }}
-//                         noValidate
-//                         autoComplete="off"
-//                     >
-//                         <div>
-//                             <TextField
-//                                 id="outlined-multiline-flexible"
-//                                 label="Option 3"
-//                                 multiline
-//                                 maxRows={4}
-//                             />
-//                         </div>
-//                     </Box>
-//                 </Grid>
-//                 <Grid size={6}>
-//                     <Box
-//                         component="form"
-//                         sx={{ '& .MuiTextField-root': { m: 1, width: '25ch' } }}
-//                         noValidate
-//                         autoComplete="off"
-//                     >
-//                         <div>
-//                             <TextField
-//                                 id="outlined-multiline-flexible"
-//                                 label="Option 4"
-//                                 multiline
-//                                 maxRows={4}
-//                             />
-//                         </div>
-//                     </Box>
-//                 </Grid>
-//             </Grid>
-//             <Button onClick={() => buttonDeleteQuestion(question)} variant="outlined" startIcon={<DeleteIcon />}>
-//                 Delete
-//             </Button>
-//             <Divider variant="middle" />
-//             <Stack direction="row" spacing={5}>
-//                 <Button onClick={() => buttonAddQuestion()} variant="outlined" startIcon={<AddIcon />}>
-//                     Add Question
-//                 </Button>
-//                 <Button onClick={() => buttonOnSend()} variant="contained" endIcon={<SendIcon />}>
-//                     Send
-//                 </Button>
-//             </Stack>
-//         </div>
-//     );
-// }
