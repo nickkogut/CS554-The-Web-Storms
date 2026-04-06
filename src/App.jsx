@@ -12,17 +12,16 @@ function App() {
   return (
     <AuthProvider>
       <Routes>
+        <Route path='/' element={<ModeratorPage />}/>
+
+        <Route path='/signup' element={<SignUp />} />
+        <Route path='/login' element={<Login />} />
+        <Route path='/logout' element={<LogOut />} /> {/* Temporary - This will just be accessed as a button on other pages */}
+
         <Route path='/change-password' element={<PrivateRoute />}>
           <Route path='/change-password' element={<ChangePassword />} />
         </Route>
 
-        <Route path='/logout' element={<LogOut />} /> {/* Temporary - This will just be accessed as a button on other pages */}
-
-        <Route path='/login' element={<Login />} />
-        <div className="App">
-          <ModeratorPage />
-        </div>
-        <Route path='/signup' element={<SignUp />} />
       </Routes>
     </AuthProvider>
   );
