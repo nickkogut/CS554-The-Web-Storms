@@ -7,6 +7,8 @@ import SignUp from './components/auth/SignUp';
 import ChangePassword from './components/auth/ChangePassword';
 import LogOut from './components/auth/LogOut';
 import Leaderboard from './components/leaderboard/Leaderboard';
+import Dashboard from './components/Dashboard.jsx';
+import JoinQuiz from './components/JoinQuiz.jsx';
 
 function App() {
   return (
@@ -20,7 +22,11 @@ function App() {
 
           <Route path='/login' element={<Login/>} />
           <Route path='/signup' element={<SignUp/>} />
+          
           <Route path='/leaderboard' element={<Leaderboard/>} />
+
+          <Route path='/' element={<Dashboard/>}/>
+          <Route path='/join' element={<JoinQuiz/>}/>
         </Routes>
     </AuthProvider>
   );
