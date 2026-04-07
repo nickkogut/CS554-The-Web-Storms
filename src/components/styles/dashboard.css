@@ -39,7 +39,7 @@
     padding: 10px;
     border-radius: 5px;
     margin: auto;
-    width: 325px;
+    width: fit-content;
     box-sizing: border-box;
     box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
 }

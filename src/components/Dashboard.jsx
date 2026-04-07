@@ -1,8 +1,7 @@
 import { Link } from "react-router-dom";
 import { useContext } from "react";
 import { AuthContext } from "../context/AuthContext";
-import "./dashboard.css";
-
+import "./styles/dashboard.css"
 function FormSearch(e){
     e.preventDefault();
     console.log("Searched")
@@ -26,17 +25,17 @@ function Dashboard(){
                 )
                 }
             </div>
-            <form onSubmit={FormSearch} className="submit-form">
+            {/* <form onSubmit={FormSearch} className="submit-form">
                 <input  className="submit-text" type="text" placeholder="Search for quiz"></input>
                 <button className="submit-button" type="submit">Search</button>
-            </form>
+            </form> */}
         </div>
 
         <br></br>
         <div className="dash-buttons">
-        <Link className="join" to="/join">Join Quiz</Link>
+        <Link to="/join" className="join">Join Quiz</Link>
         <br></br>
-        <Link className="host">Host Quiz</Link>
+        <Link to ="/host" className="host">Host Quiz</Link>
         </div>
         <br></br>
     </div>

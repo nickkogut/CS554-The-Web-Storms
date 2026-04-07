@@ -3,6 +3,12 @@
     color:cornflowerblue;
 }
 
+.join-container {
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
 .pin-button{
     display: inline-block;
     border-radius: 5px;

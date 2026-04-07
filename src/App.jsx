@@ -10,12 +10,13 @@ import Leaderboard from './components/leaderboard/Leaderboard';
 import Dashboard from './components/Dashboard.jsx';
 import JoinQuiz from './components/JoinQuiz.jsx';
 import ModeratorPage from './components/ModeratorPage';
+import HostQuiz from './components/HostQuiz.jsx';
 
 function App() {
   return (
     <AuthProvider>
       <Routes>
-        <Route path='/moderator' element={<ModeratorPage />}/>
+        <Route path='/create-quiz' element={<ModeratorPage />}/>
 
           <Route path='/login' element={<Login/>} />
           <Route path='/signup' element={<SignUp/>} />
@@ -24,6 +25,8 @@ function App() {
 
           <Route path='/' element={<Dashboard/>}/>
           <Route path='/join' element={<JoinQuiz/>}/>
+          <Route path='/host' element={<HostQuiz/>}/>
+
           <Route path='/logout' element={<LogOut />} /> {/* Temporary - This will just be accessed as a button on other pages */}
 
           <Route path='/change-password' element={<PrivateRoute />}/>
