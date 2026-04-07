@@ -1,0 +1,65 @@
+.join-container, .pin-form, .pin-input, .pin-button, .join-home{
+    font-family:'Gill Sans', 'Gill Sans MT', Calibri, 'Trebuchet MS', sans-serif;
+    color:cornflowerblue;
+}
+
+.pin-button{
+    display: inline-block;
+    border-radius: 5px;
+    padding: 10px;
+    font-size: 40px;
+    color:cornflowerblue;
+    text-decoration: none;
+    text-align: center;
+    transition: all 0.2s ease;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+    background-color:honeydew;
+    width: 210px;
+    margin: 10px;
+    border: 0;
+}
+
+.pin-button:hover{
+    transform: scale(1.05);
+}
+
+.pin-button:active{
+    transform: scale(0.95);
+}
+
+.pin-section{
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.pin-input{
+    width: 200px;
+    height: 40px;
+    margin: 10px;
+    font-size: 30px;
+    text-align: center;
+}
+
+.pin-form{
+    display: flex;
+    flex-direction: column;
+    background-color: white;
+    width: fit-content;
+    border-radius: 5px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+}
+
+.top-bar{
+    background-color: white;
+    display: flex;
+    flex-direction: row;
+    border-radius: 5px;
+    width: fit-content;
+    align-items: center;
+}
+
+.join-home{
+    text-decoration: none;
+    padding: 10px;
+}

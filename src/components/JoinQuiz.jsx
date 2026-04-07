@@ -1,18 +1,18 @@
 import { Link } from "react-router-dom";
 import { useContext } from "react";
 import { AuthContext } from "../context/AuthContext";
-import "./dashboard.css";
+import './joinquiz.css';
 
-function FormSearch(e){
+function EnterPIN(e){
     e.preventDefault();
-    console.log("Searched")
+    console.log("pin entered")
 }
 
-function Dashboard(){
+function JoinQuiz(){
   const {currentUser} = useContext(AuthContext);
 
   return (
-    <div className="container">
+    <div className="join-container">
         <div className="top-bar">
             <div className="login">
                 {currentUser ? 
@@ -26,21 +26,16 @@ function Dashboard(){
                 )
                 }
             </div>
-            <form onSubmit={FormSearch} className="submit-form">
-                <input  className="submit-text" type="text" placeholder="Search for quiz"></input>
-                <button className="submit-button" type="submit">Search</button>
+            <Link className="join-home" to="/">Home</Link>
+        </div>
+        <div className="pin-section">
+            <form onSubmit={EnterPIN} className="pin-form">
+                <input  className="pin-input" type="text" placeholder="PIN"></input>
+                <button className="pin-button" type="submit">Join Quiz</button>
             </form>
         </div>
-
-        <br></br>
-        <div className="dash-buttons">
-        <Link className="join" to="/join">Join Quiz</Link>
-        <br></br>
-        <Link className="host">Host Quiz</Link>
-        </div>
-        <br></br>
     </div>
   );
 }
 
-export default Dashboard;
+export default JoinQuiz;
