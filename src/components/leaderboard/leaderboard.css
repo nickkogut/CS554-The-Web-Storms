@@ -1,0 +1,25 @@
+.leaderboard-root{
+  max-width:720px;
+  margin:24px auto;
+  padding:12px;
+}
+.leaderboard-title{
+  margin:0 0 8px 0;
+  font-size:18px;
+}
+.leaderboard-list table{ 
+    width:100%; 
+    border-collapse:collapse 
+}
+.leaderboard-list th, .leaderboard-list td{ 
+    text-align:left; 
+    padding:8px; 
+    border-bottom:1px solid #000000 
+}
+
+.leaderboard-list tr.top td{ font-weight:bold}
+.leaderboard-empty{ 
+    text-align:center; 
+    color:#666; 
+    padding:14px 
+}
