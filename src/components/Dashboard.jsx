@@ -2,6 +2,9 @@ import { Link } from "react-router-dom";
 import { useContext } from "react";
 import { AuthContext } from "../context/AuthContext";
 import "./styles/dashboard.css"
+import LogInButton from "./auth/LogInButton";
+import LogOutButton from "./auth/LogOutButton";
+
 function FormSearch(e){
     e.preventDefault();
     console.log("Searched")
@@ -17,11 +20,11 @@ function Dashboard(){
                 {currentUser ? 
 
                 (
-                <Link className="login-text" to='/signout'>Sign Out</Link>
+                <LogOutButton/>
                 ) : 
 
                 (
-                <Link className="login-text" to='/login'>Log In</Link>
+                <LogInButton/>
                 )
                 }
             </div>

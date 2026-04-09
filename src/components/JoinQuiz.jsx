@@ -2,6 +2,8 @@ import { Link } from "react-router-dom";
 import { useContext } from "react";
 import { AuthContext } from "../context/AuthContext";
 import "./styles/joinquiz.css"
+import LogInButton from "./auth/LogInButton";
+import LogOutButton from "./auth/LogOutButton";
 
 function EnterPIN(e){
     e.preventDefault();
@@ -18,11 +20,11 @@ function JoinQuiz(){
                 {currentUser ? 
 
                 (
-                <Link className="login-text" to='/signout'>Sign Out</Link>
+                <LogOutButton/>
                 ) : 
 
                 (
-                <Link className="login-text" to='/login'>Log In</Link>
+                <LogInButton/>
                 )
                 }
             </div>
