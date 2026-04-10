@@ -2,10 +2,10 @@ import { GraphQLError } from 'graphql';
 import { ObjectId } from 'mongodb';
 
 import client from './config/redisClient.js';
-import { questions as questionCollection } from './config/mongoCollections.js';
+import { quizzes as quizCollection } from './config/mongoCollections.js';
 
 const CACHE_KEYS = {
-  questionsAll: 'questions'
+  quiz: (code) => `quiz:${code.toUpperCase()}`
 };
 
 function ensureString(input, varName) {
@@ -26,6 +26,11 @@ function ensureString(input, varName) {
     });
   }
   return value;
+}
+
+function ensureOptionalString(input, varName) {
+  if (input === undefined || input === null) return undefined;
+  return ensureString(input, varName);
 }
 
 function ensureQuestionInput(question, index) {
@@ -79,6 +84,15 @@ function toGraph(doc) {
   return copy;
 }
 
+function generateQuizCode(length = 10) {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let code = '';
+  for (let i = 0; i < length; i += 1) {
+    code += chars[Math.floor(Math.random() * chars.length)];
+  }
+  return code;
+}
+
 async function getCached(key) {
   try {
     const raw = await client.get(key);
@@ -98,9 +112,9 @@ async function setCached(key, value) {
   }
 }
 
-async function clearQuestionsCache() {
+async function clearQuizCache(code) {
   try {
-    await client.del(CACHE_KEYS.questionsAll);
+    await client.del(CACHE_KEYS.quiz(code));
   } catch (e) {
     console.error('Redis DEL error', e);
   }
@@ -108,54 +122,86 @@ async function clearQuestionsCache() {
 
 export const resolvers = {
   Query: {
-    getQuestions: async () => {
-      const cached = await getCached(CACHE_KEYS.questionsAll);
-      if (cached) return cached;
-
-      const col = await questionCollection();
-      const docs = await col.find({}).sort({ createdAt: -1 }).toArray();
-      const result = docs.map(toGraph);
-
-      await setCached(CACHE_KEYS.questionsAll, result);
-      return result;
-    }
+    getQuizByCode: async (_, args) => {
+          const code = ensureString(args.code, 'code').toUpperCase();
+          const key = CACHE_KEYS.quiz(code);
+    
+          const cached = await getCached(key);
+          if (cached) return cached;
+    
+          const col = await quizCollection();
+          const quiz = await col.findOne({ code });
+    
+          if (!quiz) {
+            throw new GraphQLError('Quiz not found', {
+              extensions: { code: 'NOT_FOUND' }
+            });
+          }
+    
+          const result = toGraph(quiz);
+          await setCached(key, result);
+          return result;
+        }
   },
 
-  Mutation: {
-    addQuestions: async (_, args) => {
-      if (!Array.isArray(args.questions) || args.questions.length === 0) {
+   Mutation: {
+    createQuiz: async (_, args) => {
+      if (!args.quiz || typeof args.quiz !== 'object') {
+        throw new GraphQLError('quiz is required', {
+          extensions: { code: 'BAD_USER_INPUT' }
+        });
+      }
+
+      if (!Array.isArray(args.quiz.questions) || args.quiz.questions.length === 0) {
         throw new GraphQLError('questions must be a non-empty array', {
           extensions: { code: 'BAD_USER_INPUT' }
         });
       }
 
-      const normalized = args.questions.map((q, index) => ensureQuestionInput(q, index + 1));
-      const now = new Date().toISOString();
+      const createdBy = ensureOptionalString(args.quiz.createdBy, 'createdBy') || 'Anonymous';
+      const normalizedQuestions = args.quiz.questions.map((q, index) =>
+        ensureQuestionInput(q, index + 1)
+      );
 
-      const docsToInsert = normalized.map((q) => ({
-        questionText: q.questionText,
-        options: q.options,
-        correctOption: q.correctOption,
-        createdAt: now
-      }));
+      const col = await quizCollection();
 
-      const col = await questionCollection();
-      const insertResult = await col.insertMany(docsToInsert);
+      let code = '';
+      let existing = null;
 
-      if (!insertResult || !insertResult.insertedIds) {
+      for (let i = 0; i < 20; i += 1) {
+        code = generateQuizCode(10);
+        existing = await col.findOne({ code });
+        if (!existing) break;
+      }
+
+      if (existing) {
+        throw new GraphQLError('Could not generate a unique quiz code', {
+          extensions: { code: 'INTERNAL_SERVER_ERROR' }
+        });
+      }
+
+      const newDoc = {
+        code,
+        createdBy,
+        createdAt: new Date().toISOString(),
+        questions: normalizedQuestions
+      };
+
+      const insertResult = await col.insertOne(newDoc);
+
+      if (!insertResult?.insertedId) {
         throw new GraphQLError('Insert failed', {
           extensions: { code: 'INTERNAL_SERVER_ERROR' }
         });
       }
 
-      const insertedIds = Object.values(insertResult.insertedIds);
-      const insertedDocs = await col.find({ _id: { $in: insertedIds } }).toArray();
+      const created = await col.findOne({ _id: insertResult.insertedId });
+      const result = toGraph(created);
 
-      const byId = new Map(insertedDocs.map((doc) => [doc._id.toString(), toGraph(doc)]));
-      const ordered = insertedIds.map((id) => byId.get(id.toString())).filter(Boolean);
+      await clearQuizCache(code);
+      await setCached(CACHE_KEYS.quiz(code), result);
 
-      await clearQuestionsCache();
-      return ordered;
+      return result;
     }
   }
 };

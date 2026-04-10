@@ -1,10 +1,16 @@
 export const typeDefs = `#graphql
   type Question {
-    _id: String
     questionText: String
     options: [String!]
     correctOption: Int
+  }
+
+  type Quiz {
+    _id: String
+    code: String
+    createdBy: String
     createdAt: String
+    questions: [Question]
   }
 
   input QuestionInput {
@@ -13,11 +19,16 @@ export const typeDefs = `#graphql
     correctOption: Int!
   }
 
+  input QuizInput {
+    createdBy: String
+    questions: [QuestionInput!]!
+  }
+
   type Query {
-    getQuestions: [Question]
+    getQuizByCode(code: String!): Quiz
   }
 
   type Mutation {
-    addQuestions(questions: [QuestionInput!]!): [Question]
+    createQuiz(quiz: QuizInput!): Quiz
   }
 `;
