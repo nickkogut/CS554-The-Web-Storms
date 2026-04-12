@@ -3,6 +3,9 @@ import { ObjectId } from 'mongodb';
 
 import client from './config/redisClient.js';
 import { questions as questionCollection } from './config/mongoCollections.js';
+import { createUser, addQuizToHistory } from './src/components/users/users.js';
+import { getFriendRequestsForUser, addFriend, removeFriend, updateLastInteracted, blockUser, unblockUser, 
+  createFriendRequest, processFriendRequest } from './src/components/users/friendRequests.js';
 
 const CACHE_KEYS = {
   questionsAll: 'questions'
@@ -118,6 +121,20 @@ export const resolvers = {
 
       await setCached(CACHE_KEYS.questionsAll, result);
       return result;
+    },
+    // User Queries
+    getFriendRequestsForUser: async (_, __, context) => {
+      console.log("1")
+      console.log(`-----${JSON.stringify(context, null, 2)}`)
+      if (!context.user) {
+        console.log("2")
+        throw new GraphQLError("Not authenticated");
+      }
+      console.log("3")
+
+    const res = await getFriendRequestsForUser(context.user.uid);
+    return res;
+
     }
   },
 
@@ -156,6 +173,73 @@ export const resolvers = {
 
       await clearQuestionsCache();
       return ordered;
+    },
+
+    // User Mutations
+    createUser: async (_, __, context) => {
+    if (!context.user) {
+      throw new GraphQLError("Not authenticated");
     }
+
+    const user = createUser(context.user.uid, context.user.displayName);
+    return user;
+  },
+
+  addFriend: async (_, {friendId}, context) => {
+    if (!context.user) throw new GraphQLError("Not authenticated");
+
+    const user = await addFriend(context.user.uid, friendId);
+    return user;
+  },
+
+  removeFriend: async (_, {friendId}, context) => {
+    if (!context.user) throw new GraphQLError("Not authenticated");
+
+    const user = await removeFriend(context.user.uid, friendId);
+    return user;
+  },
+
+  updateLastInteracted: async (_, {friendId}, context) => {
+    if (!context.user) throw new GraphQLError("Not authenticated");
+
+    const user = await updateLastInteracted(context.user.uid, friendId);
+    return user;
+  },
+
+  addQuizToHistory: async (_, {quizResult}, context) => {
+    if (!context.user) throw new GraphQLError("Not authenticated");
+
+    const user = await addQuizToHistory(context.user.uid, quizResult);
+    return user;
+  },
+
+  blockUser: async (_, {friendId}, context) => {
+    if (!context.user) throw new GraphQLError("Not authenticated");
+
+    await blockUser(context.user.uid, friendId);
+    return true;
+  },
+
+  unblockUser: async (_, {friendId}, context) => {
+    if (!context.user) throw new GraphQLError("Not authenticated");
+
+    await unblockUser(context.user.uid, friendId);
+    return true;
+  },
+
+  createFriendRequest: async (_, {friendId}, context) => {
+    if (!context.user) throw new GraphQLError("Not authenticated");
+
+    await createFriendRequest(context.user.uid, friendId);
+    return true;
+  },
+
+  processFriendRequest: async (_, {friendId, accept}, context) => {
+    if (!context.user) throw new GraphQLError("Not authenticated");
+
+    await processFriendRequest(context.user.uid, friendId, accept);
+    return true;
+  },
+
   }
 };

@@ -1,0 +1,53 @@
+users Collection:
+
+{
+    id:                     firebase uid,
+    username:                   string,
+    friends: [{
+        id:                 firebase uid,
+        username:           string,
+        friend_timestamp    (time of becoming friends): Date,
+        lastInteracted      (most recent time of friend, send game request, ...): Date
+    },
+    ...
+
+    ],
+    quiz_history: [{
+        name:               string
+        moderator_id:       firebase uid,
+        quiz_id:            id (not implemented yet),
+        questions_correct:  int,
+        questions_total:    int,
+        placement:          int,
+        num_participants:   int,
+        timestamp:          Date
+    },
+    ...
+    ]
+}
+
+==========================================
+friend_requests Collection:
+{
+    from_id:    firebase uid,
+    to_id:      firebase uid,
+    timestamp:  Date
+}
+
+==========================================
+blocked_users Collection:
+{
+    blocker_id:     firebase uid,
+    blocked_id:     firebase uid
+}
+
+
+
+
+
+
+
+
+
+
+

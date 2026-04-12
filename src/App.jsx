@@ -11,6 +11,7 @@ import Dashboard from './components/Dashboard.jsx';
 import JoinQuiz from './components/JoinQuiz.jsx';
 import ModeratorPage from './components/ModeratorPage';
 import HostQuiz from './components/HostQuiz.jsx';
+import Mailbox from './components/Mailbox.jsx';
 
 function App() {
   return (
@@ -31,6 +32,8 @@ function App() {
 
           <Route path='/change-password' element={<PrivateRoute />}/>
           <Route path='/change-password' element={<ChangePassword />} />
+
+          <Route path='/test-mailbox' element={<Mailbox/>} />
 
       </Routes>
     </AuthProvider>

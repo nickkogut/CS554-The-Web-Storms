@@ -3,6 +3,7 @@ dist
 dist-ssr
 *.local
 package-lock.json
+firebaseServiceAccount.json
 
 # Editor directories and files
 .vscode/*

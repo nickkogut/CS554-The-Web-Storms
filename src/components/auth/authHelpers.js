@@ -29,6 +29,7 @@ export const checkUsername = (username) => {
 
 export const setFBError = (e, setError) => {
     // Input: An FB error object or its message, and a setError function. Sets the error message to a more readable format.
+    if (!e) setError("Authorization error");
     if (typeof e !== "string") e = e.message;
     e = e.trim();
     e = e.split("(auth/")[1];

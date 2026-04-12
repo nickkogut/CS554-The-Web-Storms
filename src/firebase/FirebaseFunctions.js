@@ -12,10 +12,14 @@ import {
   reauthenticateWithCredential
 } from 'firebase/auth';
 
+import {userAPI} from '../components/users/userAPI.js';
+
 async function createNewUserByEmail(email, password, username) {
     const auth = getAuth();
     await createUserWithEmailAndPassword(auth, email, password);
     await updateProfile(auth.currentUser, {displayName: username});
+    // await createUser(auth.currentUser) // Add to mongo
+    await userAPI.user.create();
 }
 
 async function changePassword(email, oldPassword, newPassword) {
@@ -32,6 +36,7 @@ async function loginGoogle() {
   let auth = getAuth();
   let socialProvider = new GoogleAuthProvider();
   await signInWithPopup(auth, socialProvider);
+  await userAPI.user.create();
 }
 
 async function loginEmail(email, password) {

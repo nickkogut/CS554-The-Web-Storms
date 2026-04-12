@@ -15,3 +15,6 @@ const getCollectionFn = (collection) => {
 
 // Listing Collections here
 export const questions = getCollectionFn('questions');
+export const users = getCollectionFn('users');
+export const friend_requests = getCollectionFn('friend_requests');
+export const blocked_users = getCollectionFn('blocked_users');
