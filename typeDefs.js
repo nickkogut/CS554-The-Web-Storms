@@ -8,10 +8,10 @@ export const typeDefs = `#graphql
   }
 
   type Friend {
-  id: String!
-  friendTimestamp: String!
-  lastInteracted: String!
-}
+    id: String!
+    friendTimestamp: String!
+    lastInteracted: String!
+  }
 
 type FriendRequest {
   from_id: String!
@@ -57,7 +57,7 @@ input QuestionInput {
 
 type Query {
   getQuestions: [Question]
-  getFriendRequestsForUser: [FriendRequest]
+  getFriendRequestsForUser: [FriendRequest!]!
 }
 
 type Mutation {

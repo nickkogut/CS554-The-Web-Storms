@@ -133,7 +133,7 @@ export const resolvers = {
       console.log("3")
 
     const res = await getFriendRequestsForUser(context.user.uid);
-    return res;
+    return res || [];
 
     }
   },

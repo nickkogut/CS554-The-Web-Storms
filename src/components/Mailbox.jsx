@@ -23,7 +23,6 @@ export const Mailbox = () => {
 
     const load = async () => {
       try {
-        // Ensure that `userAPI.friend.getRequests` handles the token internally
         const res = await userAPI.friend.getRequests();
         const requests = res.data?.getFriendRequestsForUser || [];
         setFriendRequests(requests);
