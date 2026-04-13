@@ -141,7 +141,21 @@ export const resolvers = {
           const result = toGraph(quiz);
           await setCached(key, result);
           return result;
-        }
+        },
+
+    getQuizCatalog: async () => {
+  const quizzesCollection = await quizCollection();
+
+  const allQuizzes = await quizzesCollection.find({}).toArray();
+
+  return allQuizzes.map((quiz) => ({
+    _id: quiz._id.toString(),
+    code: quiz.code,
+    createdBy: quiz.createdBy,
+    createdAt: quiz.createdAt,
+    questions: quiz.questions
+  }));
+}
   },
 
    Mutation: {

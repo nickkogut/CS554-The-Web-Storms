@@ -12,6 +12,8 @@ import JoinQuiz from './components/JoinQuiz.jsx';
 import ModeratorPage from './components/ModeratorPage';
 import HostQuiz from './components/HostQuiz.jsx';
 
+import QuizCatalog from './components/QuizCatalog.jsx';
+
 function App() {
   return (
     <AuthProvider>
@@ -30,6 +32,8 @@ function App() {
 
         <Route path='/change-password' element={<PrivateRoute />} />
         <Route path='/change-password' element={<ChangePassword />} />
+
+        <Route path='/my-quizzes' element={<QuizCatalog />} />
 
       </Routes>
     </AuthProvider>

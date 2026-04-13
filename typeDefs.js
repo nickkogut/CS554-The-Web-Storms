@@ -26,6 +26,7 @@ export const typeDefs = `#graphql
 
   type Query {
     getQuizByCode(code: String!): Quiz
+    getQuizCatalog: [Quiz]
   }
 
   type Mutation {
