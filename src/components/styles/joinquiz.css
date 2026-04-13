@@ -69,3 +69,10 @@
     text-decoration: none;
     padding: 10px;
 }
+
+.join-error{
+    color: crimson;
+    font-size: 22px;
+    text-align: center;
+    margin: 10px;
+}
