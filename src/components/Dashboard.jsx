@@ -1,44 +1,33 @@
 import { Link } from "react-router-dom";
 import { useContext } from "react";
 import { AuthContext } from "../context/AuthContext";
-import "./styles/dashboard.css"
-function FormSearch(e){
-    e.preventDefault();
-    console.log("Searched")
-}
+import { Box, AppBar, Toolbar, Button, Stack } from "@mui/material";
 
 function Dashboard(){
   const {currentUser} = useContext(AuthContext);
 
   return (
-    <div className="container">
-        <div className="top-bar">
-            <div className="login">
+    <Box sx={{ display: "flex", flexDirection: "column", height: "75vh", fontFamily: "Gill Sans, sans-serif" }}>        
+        <AppBar position="static">
+            <Toolbar>
                 {currentUser ? 
 
                 (
-                <Link className="login-text" to='/signout'>Sign Out</Link>
+                <Button component={Link} to='/signout' color="inherit" variant="contained" size="small">Sign Out</Button>
                 ) : 
 
                 (
-                <Link className="login-text" to='/login'>Log In</Link>
+                <Button component={Link} to='/login' color="inherit" variant="contained" size="small">Log In</Button>
                 )
                 }
-            </div>
-            {/* <form onSubmit={FormSearch} className="submit-form">
-                <input  className="submit-text" type="text" placeholder="Search for quiz"></input>
-                <button className="submit-button" type="submit">Search</button>
-            </form> */}
-        </div>
+            </Toolbar>
+        </AppBar>
 
-        <br></br>
-        <div className="dash-buttons">
-        <Link to="/join" className="join">Join Quiz</Link>
-        <br></br>
-        <Link to ="/host" className="host">Host Quiz</Link>
-        </div>
-        <br></br>
-    </div>
+        <Stack spacing={2} alignItems="center" sx={{ margin: "auto", mt: 10 }}>
+            <Button color="inherit" component={Link} to="/join" variant="contained" size="large">Join Quiz</Button>
+            <Button color="inherit" component={Link} to ="/host" variant="contained" size="large">Host Quiz</Button>
+        </Stack>
+    </Box>
   );
 }
 
