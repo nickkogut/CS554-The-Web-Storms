@@ -4,9 +4,8 @@ import { ObjectId } from 'mongodb';
 import client from './config/redisClient.js';
 import { quizzes as quizCollection } from './config/mongoCollections.js';
 
-const CACHE_KEYS = {
-  quiz: (code) => `quiz:${code.toUpperCase()}`
-};
+const SESSION_TTL_SECONDS = 60 * 60 * 2; // 2 hours
+const SESSION_KEY = (code) => `session:${code.toUpperCase()}`;
 
 function ensureString(input, varName) {
   if (input === undefined || input === null) {
@@ -84,7 +83,7 @@ function toGraph(doc) {
   return copy;
 }
 
-function generateQuizCode(length = 10) {
+function generateSessionCode(length = 10) {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   let code = '';
   for (let i = 0; i < length; i += 1) {
@@ -93,73 +92,60 @@ function generateQuizCode(length = 10) {
   return code;
 }
 
-async function getCached(key) {
-  try {
-    const raw = await client.get(key);
-    if (!raw) return null;
-    return JSON.parse(raw);
-  } catch (e) {
-    console.error('Redis GET error', e);
-    return null;
-  }
+async function getSessionFromRedis(code) {
+  const raw = await client.get(SESSION_KEY(code));
+  if (!raw) return null;
+  return JSON.parse(raw);
 }
 
-async function setCached(key, value) {
-  try {
-    await client.set(key, JSON.stringify(value));
-  } catch (e) {
-    console.error('Redis SET error', e);
-  }
+async function saveSessionToRedis(session) {
+  await client.set(SESSION_KEY(session.code), JSON.stringify(session), {
+    EX: SESSION_TTL_SECONDS
+  });
 }
 
-async function clearQuizCache(code) {
-  try {
-    await client.del(CACHE_KEYS.quiz(code));
-  } catch (e) {
-    console.error('Redis DEL error', e);
+async function buildUniqueSessionCode() {
+  for (let i = 0; i < 20; i += 1) {
+    const code = generateSessionCode(10);
+    const exists = await client.exists(SESSION_KEY(code));
+    if (!exists) return code;
   }
+
+  throw new GraphQLError('Could not generate a unique session code', {
+    extensions: { code: 'INTERNAL_SERVER_ERROR' }
+  });
 }
 
 export const resolvers = {
   Query: {
-    getQuizByCode: async (_, args) => {
-          const code = ensureString(args.code, 'code').toUpperCase();
-          const key = CACHE_KEYS.quiz(code);
-    
-          const cached = await getCached(key);
-          if (cached) return cached;
-    
-          const col = await quizCollection();
-          const quiz = await col.findOne({ code });
-    
-          if (!quiz) {
-            throw new GraphQLError('Quiz not found', {
-              extensions: { code: 'NOT_FOUND' }
-            });
-          }
-    
-          const result = toGraph(quiz);
-          await setCached(key, result);
-          return result;
-        },
-
     getQuizCatalog: async () => {
-      const quizzesCollection = await quizCollection();
+      const col = await quizCollection();
+      const docs = await col.find({}).sort({ createdAt: -1 }).toArray();
 
-      const allQuizzes = await quizzesCollection.find({}).toArray();
-
-      return allQuizzes.map((quiz) => ({
+      return docs.map((quiz) => ({
         _id: quiz._id.toString(),
-        code: quiz.code,
         quizName: quiz.quizName,
         createdBy: quiz.createdBy,
         createdAt: quiz.createdAt,
         questions: quiz.questions
       }));
-}
+    },
+
+    getQuizSessionByCode: async (_, args) => {
+      const code = ensureString(args.code, 'code').toUpperCase();
+      const session = await getSessionFromRedis(code);
+
+      if (!session) {
+        throw new GraphQLError('Session not found or expired', {
+          extensions: { code: 'NOT_FOUND' }
+        });
+      }
+
+      return session;
+    }
   },
 
-   Mutation: {
+  Mutation: {
     createQuiz: async (_, args) => {
       if (!args.quiz || typeof args.quiz !== 'object') {
         throw new GraphQLError('quiz is required', {
@@ -179,31 +165,14 @@ export const resolvers = {
         ensureQuestionInput(q, index + 1)
       );
 
-      const col = await quizCollection();
-
-      let code = '';
-      let existing = null;
-
-      for (let i = 0; i < 20; i += 1) {
-        code = generateQuizCode(10);
-        existing = await col.findOne({ code });
-        if (!existing) break;
-      }
-
-      if (existing) {
-        throw new GraphQLError('Could not generate a unique quiz code', {
-          extensions: { code: 'INTERNAL_SERVER_ERROR' }
-        });
-      }
-
       const newDoc = {
-        code,
-        createdBy,
         quizName,
+        createdBy,
         createdAt: new Date().toISOString(),
         questions: normalizedQuestions
       };
 
+      const col = await quizCollection();
       const insertResult = await col.insertOne(newDoc);
 
       if (!insertResult?.insertedId) {
@@ -213,12 +182,39 @@ export const resolvers = {
       }
 
       const created = await col.findOne({ _id: insertResult.insertedId });
-      const result = toGraph(created);
+      return toGraph(created);
+    },
 
-      await clearQuizCache(code);
-      await setCached(CACHE_KEYS.quiz(code), result);
+    startQuizSession: async (_, args) => {
+      const quizId = ensureString(args.quizId, 'quizId');
 
-      return result;
+      let objectId;
+      try {
+        objectId = new ObjectId(quizId);
+      } catch {
+        throw new GraphQLError('quizId must be a valid quiz id', {
+          extensions: { code: 'BAD_USER_INPUT' }
+        });
+      }
+
+      const col = await quizCollection();
+      const quiz = await col.findOne({ _id: objectId });
+
+      if (!quiz) {
+        throw new GraphQLError('Quiz not found', {
+          extensions: { code: 'NOT_FOUND' }
+        });
+      }
+
+      const code = await buildUniqueSessionCode();
+      const session = {
+        code,
+        expiresAt: new Date(Date.now() + SESSION_TTL_SECONDS * 1000).toISOString(),
+        quiz: toGraph(quiz)
+      };
+
+      await saveSessionToRedis(session);
+      return session;
     }
   }
 };

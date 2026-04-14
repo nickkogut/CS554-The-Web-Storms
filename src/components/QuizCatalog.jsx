@@ -1,5 +1,4 @@
 import React, { useContext, useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useSnackbar } from 'notistack';
 
 import AppBar from '@mui/material/AppBar';
@@ -20,6 +19,10 @@ import MenuIcon from '@mui/icons-material/Menu';
 import SearchIcon from '@mui/icons-material/Search';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import RefreshIcon from '@mui/icons-material/Refresh';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import ShareIcon from '@mui/icons-material/Share';
+import MailOutlineIcon from '@mui/icons-material/MailOutline';
+import WhatsAppIcon from '@mui/icons-material/WhatsApp';
 
 import { AuthContext } from '../context/AuthContext';
 
@@ -32,15 +35,20 @@ function formatDate(value) {
     return date.toLocaleString();
 }
 
+function buildShareMessage(code, quizName) {
+    const origin = window.location.origin;
+    return `Join my QuizQuest quiz "${quizName}" using code: ${code}\nOpen QuizQuest: ${origin}`;
+}
+
 export default function QuizCatalog() {
     const { currentUser } = useContext(AuthContext);
     const { enqueueSnackbar } = useSnackbar();
-    const navigate = useNavigate();
 
     const [quizzes, setQuizzes] = useState([]);
     const [search, setSearch] = useState('');
     const [scope, setScope] = useState('mine'); // mine | all
     const [loading, setLoading] = useState(true);
+    const [sessionsByQuizId, setSessionsByQuizId] = useState({});
 
     const myIdentity = useMemo(() => {
         return currentUser?.displayName || currentUser?.email || '';
@@ -54,7 +62,6 @@ export default function QuizCatalog() {
         query GetQuizCatalog {
           getQuizCatalog {
             _id
-            code
             quizName
             createdBy
             createdAt
@@ -78,7 +85,7 @@ export default function QuizCatalog() {
             const result = await response.json();
 
             if (!response.ok || result.errors?.length) {
-                throw new Error(result?.errors?.[0]?.message || 'Catalog is not available yet.');
+                throw new Error(result?.errors?.[0]?.message || 'Could not load quizzes.');
             }
 
             setQuizzes(Array.isArray(result.data?.getQuizCatalog) ? result.data.getQuizCatalog : []);
@@ -97,7 +104,6 @@ export default function QuizCatalog() {
 
     const filteredQuizzes = useMemo(() => {
         const q = search.trim().toLowerCase();
-
         let list = quizzes;
 
         if (scope === 'mine' && myIdentity) {
@@ -108,18 +114,126 @@ export default function QuizCatalog() {
 
         if (q) {
             list = list.filter((quiz) => {
-                const code = (quiz.code || '').toLowerCase();
-                const createdBy = (quiz.createdBy || '').toLowerCase();
                 const quizName = (quiz.quizName || '').toLowerCase();
-                return code.includes(q) || createdBy.includes(q) || quizName.includes(q);
+                const createdBy = (quiz.createdBy || '').toLowerCase();
+                const sessionCode = (sessionsByQuizId[quiz._id]?.code || '').toLowerCase();
+                return (
+                    quizName.includes(q) ||
+                    createdBy.includes(q) ||
+                    sessionCode.includes(q)
+                );
             });
         }
 
         return list;
-    }, [quizzes, search, scope, myIdentity]);
+    }, [quizzes, search, scope, myIdentity, sessionsByQuizId]);
 
-    const startQuiz = (quiz) => {
-        navigate(`/host?code=${encodeURIComponent(quiz.code)}`);
+    const startSession = async (quiz) => {
+        try {
+            const mutation = `
+        mutation StartQuizSession($quizId: String!) {
+          startQuizSession(quizId: $quizId) {
+            code
+            expiresAt
+            quiz {
+              _id
+              quizName
+              createdBy
+              createdAt
+            }
+          }
+        }
+      `;
+
+            const response = await fetch(GRAPHQL_URL, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    query: mutation,
+                    variables: { quizId: quiz._id }
+                })
+            });
+
+            const result = await response.json();
+
+            if (!response.ok || result.errors?.length) {
+                throw new Error(result?.errors?.[0]?.message || 'Could not start session.');
+            }
+
+            const session = result.data.startQuizSession;
+
+            setSessionsByQuizId((prev) => ({
+                ...prev,
+                [quiz._id]: session
+            }));
+
+            enqueueSnackbar(`Session started for "${quiz.quizName}".`, { variant: 'success' });
+            return session;
+        } catch (error) {
+            enqueueSnackbar(error.message || 'Something went wrong.', { variant: 'error' });
+            return null;
+        }
+    };
+
+    const ensureSession = async (quiz) => {
+        const existing = sessionsByQuizId[quiz._id];
+        if (existing?.code) return existing;
+        return startSession(quiz);
+    };
+
+    const handleCopyCode = async (quiz) => {
+        const session = await ensureSession(quiz);
+        if (!session?.code) return;
+
+        try {
+            await navigator.clipboard.writeText(session.code);
+            enqueueSnackbar('Quiz code copied to clipboard.', { variant: 'success' });
+        } catch {
+            enqueueSnackbar('Could not copy the quiz code.', { variant: 'error' });
+        }
+    };
+
+    const handleNativeShare = async (quiz) => {
+        const session = await ensureSession(quiz);
+        if (!session?.code) return;
+
+        const shareText = buildShareMessage(session.code, quiz.quizName);
+
+        try {
+            if (navigator.share) {
+                await navigator.share({
+                    title: 'QuizQuest quiz',
+                    text: shareText,
+                    url: window.location.origin
+                });
+            } else {
+                await navigator.clipboard.writeText(shareText);
+                enqueueSnackbar('Share is not supported here. Text copied instead.', {
+                    variant: 'info'
+                });
+            }
+        } catch {
+            enqueueSnackbar('Share cancelled or unavailable.', { variant: 'warning' });
+        }
+    };
+
+    const handleEmailShare = async (quiz) => {
+        const session = await ensureSession(quiz);
+        if (!session?.code) return;
+
+        const subject = encodeURIComponent(`Join my QuizQuest quiz: ${quiz.quizName}`);
+        const body = encodeURIComponent(buildShareMessage(session.code, quiz.quizName));
+        window.open(`mailto:?subject=${subject}&body=${body}`, '_blank', 'noopener,noreferrer');
+    };
+
+    const handleWhatsAppShare = async (quiz) => {
+        const session = await ensureSession(quiz);
+        if (!session?.code) return;
+
+        const text = encodeURIComponent(buildShareMessage(session.code, quiz.quizName));
+        window.open(`https://wa.me/?text=${text}`, '_blank', 'noopener,noreferrer');
     };
 
     return (
@@ -208,44 +322,113 @@ export default function QuizCatalog() {
                                 </CardContent>
                             </Card>
                         ) : (
-                            filteredQuizzes.map((quiz) => (
-                                <Card key={quiz._id || quiz.code} variant="outlined" sx={{ borderRadius: 3 }}>
-                                    <CardContent>
-                                        <Stack spacing={2}>
-                                            <Stack
-                                                direction={{ xs: 'column', sm: 'row' }}
-                                                justifyContent="space-between"
-                                                alignItems={{ xs: 'flex-start', sm: 'center' }}
-                                                spacing={1}
-                                            >
-                                                <Box>
-                                                    <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                                                        {quiz.quizName || 'Untitled Quiz'}
-                                                    </Typography>
-                                                    < Typography variant="body2" color="text.secondary" >
-                                                        Code: {quiz.code} • Created by {quiz.createdBy || 'Anonymous'} • {formatDate(quiz.createdAt)}
-                                                    </Typography>
-                                                </Box>
+                            filteredQuizzes.map((quiz) => {
+                                const session = sessionsByQuizId[quiz._id];
 
-                                                <Chip
-                                                    label={`${quiz.questions?.length || 0} questions`}
-                                                    variant="outlined"
-                                                />
-                                            </Stack>
-
-                                            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
-                                                <Button
-                                                    variant="contained"
-                                                    startIcon={<PlayArrowIcon />}
-                                                    onClick={() => startQuiz(quiz)}
+                                return (
+                                    <Card key={quiz._id} variant="outlined" sx={{ borderRadius: 3 }}>
+                                        <CardContent>
+                                            <Stack spacing={2}>
+                                                <Stack
+                                                    direction={{ xs: 'column', sm: 'row' }}
+                                                    justifyContent="space-between"
+                                                    alignItems={{ xs: 'flex-start', sm: 'center' }}
+                                                    spacing={1}
                                                 >
-                                                    Start Session
-                                                </Button>
+                                                    <Box>
+                                                        <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                                                            {quiz.quizName || 'Untitled Quiz'}
+                                                        </Typography>
+                                                        <Typography variant="body2" color="text.secondary">
+                                                            Created by {quiz.createdBy || 'Anonymous'} • {formatDate(quiz.createdAt)}
+                                                        </Typography>
+                                                    </Box>
+
+                                                    <Chip
+                                                        label={`${quiz.questions?.length || 0} questions`}
+                                                        variant="outlined"
+                                                    />
+                                                </Stack>
+
+                                                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} flexWrap="wrap">
+                                                    <Button
+                                                        variant="contained"
+                                                        startIcon={<PlayArrowIcon />}
+                                                        onClick={() => startSession(quiz)}
+                                                    >
+                                                        Start Session
+                                                    </Button>
+                                                    <Button
+                                                        variant="outlined"
+                                                        startIcon={<ShareIcon />}
+                                                        onClick={() => handleNativeShare(quiz)}
+                                                    >
+                                                        Share
+                                                    </Button>
+                                                </Stack>
+
+                                                {session?.code ? (
+                                                    <Card variant="outlined" sx={{ borderRadius: 2, bgcolor: '#fbfbfd' }}>
+                                                        <CardContent>
+                                                            <Stack spacing={2}>
+                                                                <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
+                                                                    Session Code
+                                                                </Typography>
+
+                                                                <Typography
+                                                                    variant="h4"
+                                                                    sx={{
+                                                                        fontWeight: 800,
+                                                                        letterSpacing: 2,
+                                                                        wordBreak: 'break-all'
+                                                                    }}
+                                                                >
+                                                                    {session.code}
+                                                                </Typography>
+
+                                                                <Typography variant="body2" color="text.secondary">
+                                                                    Expires at: {formatDate(session.expiresAt)}
+                                                                </Typography>
+
+                                                                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} flexWrap="wrap">
+                                                                    <Button
+                                                                        variant="outlined"
+                                                                        startIcon={<ContentCopyIcon />}
+                                                                        onClick={() => handleCopyCode(quiz)}
+                                                                    >
+                                                                        Copy code
+                                                                    </Button>
+                                                                    <Button
+                                                                        variant="outlined"
+                                                                        startIcon={<ShareIcon />}
+                                                                        onClick={() => handleNativeShare(quiz)}
+                                                                    >
+                                                                        Share
+                                                                    </Button>
+                                                                    <Button
+                                                                        variant="outlined"
+                                                                        startIcon={<MailOutlineIcon />}
+                                                                        onClick={() => handleEmailShare(quiz)}
+                                                                    >
+                                                                        Email
+                                                                    </Button>
+                                                                    <Button
+                                                                        variant="outlined"
+                                                                        startIcon={<WhatsAppIcon />}
+                                                                        onClick={() => handleWhatsAppShare(quiz)}
+                                                                    >
+                                                                        WhatsApp
+                                                                    </Button>
+                                                                </Stack>
+                                                            </Stack>
+                                                        </CardContent>
+                                                    </Card>
+                                                ) : null}
                                             </Stack>
-                                        </Stack>
-                                    </CardContent>
-                                </Card>
-                            ))
+                                        </CardContent>
+                                    </Card>
+                                );
+                            })
                         )}
                     </Stack>
                 </Stack>

@@ -23,10 +23,6 @@ import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import SendIcon from '@mui/icons-material/Send';
 import MenuIcon from '@mui/icons-material/Menu';
-import ContentCopyIcon from '@mui/icons-material/ContentCopy';
-import ShareIcon from '@mui/icons-material/Share';
-import MailOutlineIcon from '@mui/icons-material/MailOutline';
-import WhatsAppIcon from '@mui/icons-material/WhatsApp';
 
 import { AuthContext } from '../context/AuthContext';
 
@@ -49,18 +45,12 @@ function normalizeQuestions(questions) {
     }));
 }
 
-function buildShareMessage(code, quizName) {
-    const origin = window.location.origin;
-    return `Join my QuizQuest quiz '"${quizName}"' using code: ${code}\nOpen QuizQuest: ${origin}`;
-}
-
 export default function ModeratorPage() {
     const { currentUser } = useContext(AuthContext);
     const { enqueueSnackbar } = useSnackbar();
 
     const [quizName, setQuizName] = useState('');
     const [questions, setQuestions] = useState([createBlankQuestion()]);
-    const [quizCode, setQuizCode] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     const updateQuestionText = (questionId, value) => {
@@ -135,47 +125,6 @@ export default function ModeratorPage() {
         }
     };
 
-    const handleCopyCode = async () => {
-        try {
-            await navigator.clipboard.writeText(quizCode);
-            enqueueSnackbar('Quiz code copied to clipboard.', { variant: 'success' });
-        } catch {
-            enqueueSnackbar('Could not copy the quiz code.', { variant: 'error' });
-        }
-    };
-
-    const handleNativeShare = async () => {
-        const shareText = buildShareMessage(quizCode, quizName);
-
-        try {
-            if (navigator.share) {
-                await navigator.share({
-                    title: 'QuizQuest quiz',
-                    text: shareText,
-                    url: window.location.origin
-                });
-            } else {
-                await navigator.clipboard.writeText(shareText);
-                enqueueSnackbar('Share is not supported here. Text copied instead.', {
-                    variant: 'info'
-                });
-            }
-        } catch {
-            enqueueSnackbar('Share cancelled or unavailable.', { variant: 'warning' });
-        }
-    };
-
-    const handleEmailShare = () => {
-        const subject = encodeURIComponent(`Join my QuizQuest quiz: ${quizName}`);
-        const body = encodeURIComponent(buildShareMessage(quizCode, quizName));
-        window.open(`mailto:?subject=${subject}&body=${body}`, '_blank', 'noopener,noreferrer');
-    };
-
-    const handleWhatsAppShare = () => {
-        const text = encodeURIComponent(buildShareMessage(quizCode, quizName));
-        window.open(`https://wa.me/?text=${text}`, '_blank', 'noopener,noreferrer');
-    };
-
     const buttonOnSend = async () => {
         try {
             validateQuestions();
@@ -186,7 +135,6 @@ export default function ModeratorPage() {
         mutation CreateQuiz($quiz: QuizInput!) {
           createQuiz(quiz: $quiz) {
             _id
-            code
             quizName
             createdBy
             createdAt
@@ -225,10 +173,7 @@ export default function ModeratorPage() {
                 throw new Error(result.errors[0].message);
             }
 
-            const newCode = result.data.createQuiz.code;
-            setQuizCode(newCode);
-
-            enqueueSnackbar(`Questions sent successfully. Quiz code: ${newCode}`, {
+            enqueueSnackbar(`Quiz "${result.data.createQuiz.quizName}" saved successfully.`, {
                 variant: 'success'
             });
 
@@ -279,64 +224,6 @@ export default function ModeratorPage() {
                             />
                         </CardContent>
                     </Card>
-
-                    {quizCode ? (
-                        <Card variant="outlined" sx={{ borderRadius: 3 }}>
-                            <CardContent>
-                                <Stack spacing={2}>
-                                    <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                                        Quiz code
-                                    </Typography>
-
-                                    <Typography
-                                        variant="h4"
-                                        sx={{
-                                            fontWeight: 800,
-                                            letterSpacing: 2,
-                                            wordBreak: 'break-all'
-                                        }}
-                                    >
-                                        {quizCode}
-                                    </Typography>
-
-                                    <Typography variant="body2" color="text.secondary">
-                                        Quiz: {quizName}
-                                    </Typography>
-
-                                    <Typography variant="body2" color="text.secondary">
-                                        Share this code so players can join the quiz.
-                                    </Typography>
-
-                                    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} flexWrap="wrap">
-                                        <Button
-                                            variant="outlined"
-                                            startIcon={<ContentCopyIcon />}
-                                            onClick={handleCopyCode}
-                                        >
-                                            Copy code
-                                        </Button>
-                                        <Button variant="outlined" startIcon={<ShareIcon />} onClick={handleNativeShare}>
-                                            Share
-                                        </Button>
-                                        <Button
-                                            variant="outlined"
-                                            startIcon={<MailOutlineIcon />}
-                                            onClick={handleEmailShare}
-                                        >
-                                            Email
-                                        </Button>
-                                        <Button
-                                            variant="outlined"
-                                            startIcon={<WhatsAppIcon />}
-                                            onClick={handleWhatsAppShare}
-                                        >
-                                            WhatsApp
-                                        </Button>
-                                    </Stack>
-                                </Stack>
-                            </CardContent>
-                        </Card>
-                    ) : null}
 
                     {questions.map((question, index) => (
                         <Card key={question.id} variant="outlined" sx={{ borderRadius: 3 }}>

@@ -7,11 +7,16 @@ export const typeDefs = `#graphql
 
   type Quiz {
     _id: String
-    code: String
     quizName: String
     createdBy: String
     createdAt: String
     questions: [Question]
+  }
+
+  type QuizSession {
+    code: String!
+    expiresAt: String
+    quiz: Quiz!
   }
 
   input QuestionInput {
@@ -27,11 +32,12 @@ export const typeDefs = `#graphql
   }
 
   type Query {
-    getQuizByCode(code: String!): Quiz
     getQuizCatalog: [Quiz]
+    getQuizSessionByCode(code: String!): QuizSession
   }
 
   type Mutation {
     createQuiz(quiz: QuizInput!): Quiz
+    startQuizSession(quizId: String!): QuizSession
   }
 `;
