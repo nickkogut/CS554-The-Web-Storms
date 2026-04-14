@@ -49,16 +49,16 @@ function normalizeQuestions(questions) {
     }));
 }
 
-
-function buildShareMessage(code) {
+function buildShareMessage(code, quizName) {
     const origin = window.location.origin;
-    return `Join my QuizQuest quiz using code: ${code}\nOpen QuizQuest: ${origin}`;
+    return `Join my QuizQuest quiz '"${quizName}"' using code: ${code}\nOpen QuizQuest: ${origin}`;
 }
 
 export default function ModeratorPage() {
     const { currentUser } = useContext(AuthContext);
     const { enqueueSnackbar } = useSnackbar();
 
+    const [quizName, setQuizName] = useState('');
     const [questions, setQuestions] = useState([createBlankQuestion()]);
     const [quizCode, setQuizCode] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -107,12 +107,15 @@ export default function ModeratorPage() {
             }
 
             enqueueSnackbar('Question removed.', { variant: 'info' });
-
             return prev.filter((q) => q.id !== questionId);
         });
     };
 
     const validateQuestions = () => {
+        if (!quizName.trim()) {
+            throw new Error('Quiz name cannot be empty.');
+        }
+
         for (let i = 0; i < questions.length; i++) {
             const q = questions[i];
 
@@ -142,7 +145,7 @@ export default function ModeratorPage() {
     };
 
     const handleNativeShare = async () => {
-        const shareText = buildShareMessage(quizCode);
+        const shareText = buildShareMessage(quizCode, quizName);
 
         try {
             if (navigator.share) {
@@ -163,13 +166,13 @@ export default function ModeratorPage() {
     };
 
     const handleEmailShare = () => {
-        const subject = encodeURIComponent('Join my QuizQuest quiz');
-        const body = encodeURIComponent(buildShareMessage(quizCode));
+        const subject = encodeURIComponent(`Join my QuizQuest quiz: ${quizName}`);
+        const body = encodeURIComponent(buildShareMessage(quizCode, quizName));
         window.open(`mailto:?subject=${subject}&body=${body}`, '_blank', 'noopener,noreferrer');
     };
 
     const handleWhatsAppShare = () => {
-        const text = encodeURIComponent(buildShareMessage(quizCode));
+        const text = encodeURIComponent(buildShareMessage(quizCode, quizName));
         window.open(`https://wa.me/?text=${text}`, '_blank', 'noopener,noreferrer');
     };
 
@@ -184,6 +187,7 @@ export default function ModeratorPage() {
           createQuiz(quiz: $quiz) {
             _id
             code
+            quizName
             createdBy
             createdAt
             questions {
@@ -204,6 +208,7 @@ export default function ModeratorPage() {
                     query: mutation,
                     variables: {
                         quiz: {
+                            quizName: quizName.trim(),
                             createdBy: currentUser?.displayName || currentUser?.email || 'Anonymous',
                             questions: payload
                         }
@@ -228,6 +233,7 @@ export default function ModeratorPage() {
             });
 
             setQuestions([createBlankQuestion()]);
+            setQuizName('');
         } catch (error) {
             enqueueSnackbar(error.message || 'Something went wrong.', {
                 variant: 'error'
@@ -257,10 +263,22 @@ export default function ModeratorPage() {
                             Create Questions
                         </Typography>
                         <Typography variant="body1" color="text.secondary">
-                            Add questions, enter four options, choose the correct answer, and send them to the backend.
+                            Add a quiz name, enter four options, choose the correct answer, and send them to the backend.
                         </Typography>
                     </Box>
 
+
+                    <Card variant="outlined" sx={{ borderRadius: 3 }}>
+                        <CardContent>
+                            <TextField
+                                label="Quiz Name"
+                                value={quizName}
+                                onChange={(e) => setQuizName(e.target.value)}
+                                fullWidth
+                                required
+                            />
+                        </CardContent>
+                    </Card>
 
                     {quizCode ? (
                         <Card variant="outlined" sx={{ borderRadius: 3 }}>
@@ -279,6 +297,10 @@ export default function ModeratorPage() {
                                         }}
                                     >
                                         {quizCode}
+                                    </Typography>
+
+                                    <Typography variant="body2" color="text.secondary">
+                                        Quiz: {quizName}
                                     </Typography>
 
                                     <Typography variant="body2" color="text.secondary">

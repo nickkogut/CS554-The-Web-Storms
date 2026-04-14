@@ -144,17 +144,18 @@ export const resolvers = {
         },
 
     getQuizCatalog: async () => {
-  const quizzesCollection = await quizCollection();
+      const quizzesCollection = await quizCollection();
 
-  const allQuizzes = await quizzesCollection.find({}).toArray();
+      const allQuizzes = await quizzesCollection.find({}).toArray();
 
-  return allQuizzes.map((quiz) => ({
-    _id: quiz._id.toString(),
-    code: quiz.code,
-    createdBy: quiz.createdBy,
-    createdAt: quiz.createdAt,
-    questions: quiz.questions
-  }));
+      return allQuizzes.map((quiz) => ({
+        _id: quiz._id.toString(),
+        code: quiz.code,
+        quizName: quiz.quizName,
+        createdBy: quiz.createdBy,
+        createdAt: quiz.createdAt,
+        questions: quiz.questions
+      }));
 }
   },
 
@@ -172,6 +173,7 @@ export const resolvers = {
         });
       }
 
+      const quizName = ensureString(args.quiz.quizName, 'quizName');
       const createdBy = ensureOptionalString(args.quiz.createdBy, 'createdBy') || 'Anonymous';
       const normalizedQuestions = args.quiz.questions.map((q, index) =>
         ensureQuestionInput(q, index + 1)
@@ -197,6 +199,7 @@ export const resolvers = {
       const newDoc = {
         code,
         createdBy,
+        quizName,
         createdAt: new Date().toISOString(),
         questions: normalizedQuestions
       };

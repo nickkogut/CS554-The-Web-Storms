@@ -8,6 +8,7 @@ export const typeDefs = `#graphql
   type Quiz {
     _id: String
     code: String
+    quizName: String
     createdBy: String
     createdAt: String
     questions: [Question]
@@ -20,6 +21,7 @@ export const typeDefs = `#graphql
   }
 
   input QuizInput {
+    quizName: String!
     createdBy: String
     questions: [QuestionInput!]!
   }

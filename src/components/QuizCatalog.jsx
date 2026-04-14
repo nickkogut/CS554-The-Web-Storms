@@ -27,7 +27,7 @@ const GRAPHQL_URL = 'http://localhost:4000/';
 
 function formatDate(value) {
     if (!value) return '—';
-    const date = new Date(value);``
+    const date = new Date(value); ``
     if (Number.isNaN(date.getTime())) return '—';
     return date.toLocaleString();
 }
@@ -55,6 +55,7 @@ export default function QuizCatalog() {
           getQuizCatalog {
             _id
             code
+            quizName
             createdBy
             createdAt
             questions {
@@ -109,7 +110,8 @@ export default function QuizCatalog() {
             list = list.filter((quiz) => {
                 const code = (quiz.code || '').toLowerCase();
                 const createdBy = (quiz.createdBy || '').toLowerCase();
-                return code.includes(q) || createdBy.includes(q);
+                const quizName = (quiz.quizName || '').toLowerCase();
+                return code.includes(q) || createdBy.includes(q) || quizName.includes(q);
             });
         }
 
@@ -150,7 +152,7 @@ export default function QuizCatalog() {
                                 <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} alignItems="center">
                                     <TextField
                                         fullWidth
-                                        label="Search by code or creator"
+                                        label="Search by Quiz Name, Quiz Code or Quiz Creator"
                                         value={search}
                                         onChange={(e) => setSearch(e.target.value)}
                                         InputProps={{
@@ -218,10 +220,10 @@ export default function QuizCatalog() {
                                             >
                                                 <Box>
                                                     <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                                                        Quiz Code: {quiz.code}
+                                                        {quiz.quizName || 'Untitled Quiz'}
                                                     </Typography>
-                                                    <Typography variant="body2" color="text.secondary">
-                                                        Created by {quiz.createdBy || 'Anonymous'} • {formatDate(quiz.createdAt)}
+                                                    < Typography variant="body2" color="text.secondary" >
+                                                        Code: {quiz.code} • Created by {quiz.createdBy || 'Anonymous'} • {formatDate(quiz.createdAt)}
                                                     </Typography>
                                                 </Box>
 
