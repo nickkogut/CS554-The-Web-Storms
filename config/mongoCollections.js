@@ -15,3 +15,4 @@ const getCollectionFn = (collection) => {
 
 // Listing Collections here
 export const questions = getCollectionFn('questions');
+export const quizzes = getCollectionFn('quizzes');

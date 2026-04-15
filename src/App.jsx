@@ -12,25 +12,28 @@ import JoinQuiz from './components/JoinQuiz.jsx';
 import ModeratorPage from './components/ModeratorPage';
 import HostQuiz from './components/HostQuiz.jsx';
 
+import QuizCatalog from './components/QuizCatalog.jsx';
+
 function App() {
   return (
     <AuthProvider>
       <Routes>
-        <Route path='/create-quiz' element={<ModeratorPage />}/>
+        <Route path='/create-quiz' element={<ModeratorPage />} />
+        <Route path='/login' element={<Login />} />
+        <Route path='/signup' element={<SignUp />} />
 
-          <Route path='/login' element={<Login/>} />
-          <Route path='/signup' element={<SignUp/>} />
-          
-          <Route path='/leaderboard' element={<Leaderboard/>} />
+        <Route path='/leaderboard' element={<Leaderboard />} />
 
-          <Route path='/' element={<Dashboard/>}/>
-          <Route path='/join' element={<JoinQuiz/>}/>
-          <Route path='/host' element={<HostQuiz/>}/>
+        <Route path='/' element={<Dashboard />} />
+        <Route path='/join' element={<JoinQuiz />} />
+        <Route path='/host' element={<HostQuiz />} />
 
-          <Route path='/logout' element={<LogOut />} /> {/* Temporary - This will just be accessed as a button on other pages */}
+        <Route path='/logout' element={<LogOut />} /> {/* Temporary - This will just be accessed as a button on other pages */}
 
-          <Route path='/change-password' element={<PrivateRoute />}/>
-          <Route path='/change-password' element={<ChangePassword />} />
+        <Route path='/change-password' element={<PrivateRoute />} />
+        <Route path='/change-password' element={<ChangePassword />} />
+
+        <Route path='/my-quizzes' element={<QuizCatalog />} />
 
       </Routes>
     </AuthProvider>

@@ -5,7 +5,7 @@ import './leaderboard.css';
 const STORAGE_KEY = 'quiz_leaderboard';
 
 export default function Leaderboard() {
- 
+
   const [entries, setEntries] = useState([]);
   const lastRawRef = useRef(null);  // keep previous raw JSON string to detect changes
 
