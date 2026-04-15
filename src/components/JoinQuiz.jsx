@@ -1,7 +1,5 @@
-import { Link } from "react-router-dom";
-import { useContext } from "react";
-import { AuthContext } from "../context/AuthContext";
-import "./styles/joinquiz.css"
+import { Box, Button, Stack, TextField } from "@mui/material";
+import Navbar from "./Navbar";
 
 function EnterPIN(e){
     e.preventDefault();
@@ -9,32 +7,19 @@ function EnterPIN(e){
 }
 
 function JoinQuiz(){
-  const {currentUser} = useContext(AuthContext);
 
   return (
-    <div className="join-container">
-        <div className="top-bar">
-            <div className="login">
-                {currentUser ? 
-
-                (
-                <Link className="login-text" to='/signout'>Sign Out</Link>
-                ) : 
-
-                (
-                <Link className="login-text" to='/login'>Log In</Link>
-                )
-                }
-            </div>
-            <Link className="join-home" to="/">Home</Link>
-        </div>
-        <div className="pin-section">
-            <form onSubmit={EnterPIN} className="pin-form">
-                <input  className="pin-input" type="text" placeholder="PIN"></input>
-                <button className="pin-button" type="submit">Join Quiz</button>
-            </form>
-        </div>
-    </div>
+    <Box sx={{ display: "flex", flexDirection: "column", height: "75vh", fontFamily: "Gill Sans, sans-serif" }}>        
+        <Navbar/>
+        <Stack spacing={2} alignItems="center" sx={{ margin: "auto", mt: 10 }}>
+            <TextField onSubmit={EnterPIN}
+                label="PIN"
+                variant="outlined"
+                onKeyDown={(e) => e.key === "Enter" && EnterPIN(e)}
+            ></TextField>
+            <Button variant="contained" onClick={EnterPIN}>Join Quiz</Button>
+        </Stack>
+    </Box>
   );
 }
 
