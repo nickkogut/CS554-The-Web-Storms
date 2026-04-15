@@ -1,6 +1,6 @@
 import React, {useContext, useState} from 'react';
 import GoogleLogin from './GoogleLogin';
-import {Navigate} from 'react-router-dom';
+import {Link, Navigate} from 'react-router-dom';
 import {AuthContext} from '../../context/AuthContext';
 import {checkEmail, checkPassword, setFBError} from "./authHelpers.js";
 import {loginEmail, resetPassword} from '../../firebase/FirebaseFunctions';
@@ -60,6 +60,7 @@ function Login() {
         <div className="btn-shelf">
           <button className="auth-btn" name="submit-btn" type="submit">Login</button>
           <button className="auth-btn" id="reset-password-btn" type="button" onClick={() => handleResetPassword()}>Forgot Password</button>
+          <Link to="/signup" className="auth-btn">Create a new account</Link>
           <GoogleLogin setError={setError} />
         </div>
         </form>

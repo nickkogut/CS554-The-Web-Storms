@@ -8,16 +8,18 @@ export const typeDefs = `#graphql
   }
 
   type Friend {
-    id: String!
+    _id: String!
+    name: String!
     friendTimestamp: String!
     lastInteracted: String!
   }
 
-type FriendRequest {
-  from_id: String!
-  to_id: String!
-  timestamp: String!
-}
+  type FriendRequest {
+    from_id: String!
+    from_name: String!
+    to_id: String!
+    timestamp: String!
+  }
 
 input QuizResultInput {
   name: String!
@@ -43,9 +45,10 @@ type QuizResult {
 }
 
 type User {
-  id: String
-  email: String
-  friends: [Friend]
+  _id: String!
+  name: String!
+  email: String!
+  friends: [Friend!]!
   quiz_history: [QuizResult!]!
 }
 
@@ -57,7 +60,10 @@ input QuestionInput {
 
 type Query {
   getQuestions: [Question]
-  getFriendRequestsForUser: [FriendRequest!]!
+  getUser: User
+  getFriendRequestsForUser: [FriendRequest]
+  getFriendsForUser: [Friend]
+
 }
 
 type Mutation {

@@ -3,7 +3,7 @@ import { ObjectId } from 'mongodb';
 
 import client from './config/redisClient.js';
 import { questions as questionCollection } from './config/mongoCollections.js';
-import { createUser, addQuizToHistory } from './src/components/users/users.js';
+import { createUser, getUser, addQuizToHistory } from './src/components/users/users.js';
 import { getFriendRequestsForUser, addFriend, removeFriend, updateLastInteracted, blockUser, unblockUser, 
   createFriendRequest, processFriendRequest } from './src/components/users/friendRequests.js';
 
@@ -122,19 +122,26 @@ export const resolvers = {
       await setCached(CACHE_KEYS.questionsAll, result);
       return result;
     },
+
     // User Queries
     getFriendRequestsForUser: async (_, __, context) => {
-      console.log("1")
-      console.log(`-----${JSON.stringify(context, null, 2)}`)
-      if (!context.user) {
-        console.log("2")
-        throw new GraphQLError("Not authenticated");
-      }
-      console.log("3")
+      if (!context.user) throw new GraphQLError("Not authenticated");
+      const res = await getFriendRequestsForUser(context.user.uid);
+      return res || [];
+    },
 
-    const res = await getFriendRequestsForUser(context.user.uid);
-    return res || [];
+    getFriendsForUser: async (_, __, context) => {
+      if (!context.user) throw new GraphQLError("Not authenticated");
+      
+      const user = await getUser(context.user.uid);
+      return user?.friends || [];
+    },
 
+    getUser: async (_, __, context) => {
+      if (!context.user) throw new GraphQLError("Not authenticated");
+      
+      const user = await getUser(context.user.uid); // Throws if no user found
+      return user;
     }
   },
 
@@ -177,11 +184,8 @@ export const resolvers = {
 
     // User Mutations
     createUser: async (_, __, context) => {
-    if (!context.user) {
-      throw new GraphQLError("Not authenticated");
-    }
-
-    const user = createUser(context.user.uid, context.user.displayName);
+    if (!context.user) throw new GraphQLError("Not authenticated");
+    const user = createUser(context.user.uid, context.user.name);
     return user;
   },
 

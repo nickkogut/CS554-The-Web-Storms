@@ -1,33 +1,35 @@
 import {users, friend_requests, blocked_users} from '../../../config/mongoCollections.js';
 
+
 export const addFriend = async (currId, friendId) => {
-    usersCollection = await users();
+    const usersCollection = await users();
     if (currId === friendId) throw "Error: You cannot friend yourself";
 
     // Ensure all parties exist and are not already friends
-    const user = await usersCollection.findOne({id: currId});
-    const friend = await usersCollection.findOne({id: friendId});
+    const user = await usersCollection.findOne({_id: currId});
+    const friend = await usersCollection.findOne({_id: friendId});
 
     if (!user || !friend) throw "Error: could not locate both users";
-    if (user.friends.find(friend => friend.id === friendId)) return user; // already friends
+    if (user.friends.find(friend => friend._id === friendId)) return user; // already friends
 
     const now = new Date();
 
     const newUser = await usersCollection.updateOne(
-        { id: currId },
+        { _id: currId },
         { $push: 
             { friends: {
-            id: friendId,
+            _id: friendId,
+            name: friend.name,
             friendTimestamp: now,
             lastInteracted: now
         }}}
     );
 
     await usersCollection.updateOne(
-        { id: friendId },
+        { _id: friendId },
         { $push: 
             { friends: {
-            id: currId,
+            _id: currId,
             friendTimestamp: now,
             lastInteracted: now
         }}}
@@ -37,23 +39,23 @@ export const addFriend = async (currId, friendId) => {
 }
 
 export const removeFriend = async (currId, friendId) => {
-    usersCollection = await users();
+    const usersCollection = await users();
     if (currId === friendId) throw "Error: You cannot unfriend yourself";
 
-    const user = await usersCollection.findOne({id: currId});
-    const friend = await usersCollection.findOne({id: friendId});
+    const user = await usersCollection.findOne({_id: currId});
+    const friend = await usersCollection.findOne({_id: friendId});
 
     if (!user || !friend) throw "Error: could not locate both users";
     if (!user.friends.find(friend => friend.id === friendId)) throw "Error: You were not already friends";
 
     const newUser = await usersCollection.updateOne(
-        {id: currId},
-        {$pull: {friends: {id: friendId}}}
+        {_id: currId},
+        {$pull: {friends: {_id: friendId}}}
     );
 
     await usersCollection.updateOne(
-        {id: friendId},
-        {$pull: {friends: {id: currId}}}
+        {_id: friendId},
+        {$pull: {friends: {_id: currId}}}
     );
 
     return newUser;
@@ -63,8 +65,8 @@ export const updateLastInteracted = async (currId, friendId) => {
     const usersCollection = await users();
     if (currId === friendId) throw "Error: same user passed as both friends";
 
-    const user = await usersCollection.findOne({id: currId});
-    const friend = await usersCollection.findOne({id: friendId});
+    const user = await usersCollection.findOne({_id: currId});
+    const friend = await usersCollection.findOne({_id: friendId});
 
     if (!user || !friend) throw "Error: could not locate both users";
     if (!user.friends.find(f => f.id === friendId)) throw "Error: You were not already friends";
@@ -72,12 +74,12 @@ export const updateLastInteracted = async (currId, friendId) => {
     const now = new Date();
 
     const newUser = await usersCollection.updateOne(
-        {id: currId, "friends.id": friendId},
+        {_id: currId, "friends.id": friendId},
         {$set: {"friends.$.last_played": now}}
     );
 
     await usersCollection.updateOne(
-        {id: friendId, "friends.id": currId},
+        {_id: friendId, "friends.id": currId},
         {$set: {"friends.$.last_played": now}}
     );
 
@@ -106,11 +108,11 @@ const isBlocked = async (id1, id2) => {
 export const blockUser = async (currId, blockedId) => {
     const usersCollection = await users();
     const blockedCollection = await blocked_users();
-    const requestsCollection = await requests_collection();
+    const requestsCollection = await friend_requests();
 
     if (currId === friendId) throw "Error: cannot block yourself";
-    const currUser = await usersCollection.findOne({id: currId});
-    const blockedUser = await usersCollection.findOne({id: blockedId});
+    const currUser = await usersCollection.findOne({_id: currId});
+    const blockedUser = await usersCollection.findOne({_id: blockedId});
     if (!currUser || !blockedUser) throw "Error: failed to locate both users";
 
     // Unfriend the user and kill all friend requests to/from them
@@ -136,8 +138,8 @@ export const unblockUser = async (currId, blockedId) => {
     const blockedCollection = await blocked_users();
 
     if (currId === friendId) throw "Error: cannot unblock yourself";
-    const currUser = await usersCollection.findOne({id: currId});
-    const blockedUser = await usersCollection.findOne({id: blockedId});
+    const currUser = await usersCollection.findOne({_id: currId});
+    const blockedUser = await usersCollection.findOne({_id: blockedId});
     if (!currUser || !blockedUser) throw "Error: failed to locate both users";
 
     const alreadyBlocked = await blockedCollection.findOne({blocker_id: currId, blocked_id: blockedId});
@@ -155,8 +157,8 @@ export const createFriendRequest = async (currId, friendId) => {
     const requestsCollection = await friend_requests();
 
     if (currId === friendId) throw "Error: cannot friend yourself";
-    const fromUser = await usersCollection.findOne({id: currId});
-    const toUser = await usersCollection.findOne({id: friendId});
+    const fromUser = await usersCollection.findOne({_id: currId});
+    const toUser = await usersCollection.findOne({_id: friendId});
     if (!fromUser || !toUser) throw "Error: failed to locate both users";
     if (fromUser.friends.find(f => f.id === friendId)) throw "Error: you are already friends";
 
@@ -176,7 +178,7 @@ export const createFriendRequest = async (currId, friendId) => {
     // Send the request or update the timestamp on an existing one
     const result = await requestsCollection.updateOne(
         {from_id: currId, to_id: friendId},
-        {$set: {from_id: currId, to_id: friendId, updated_at: now},
+        {$set: {from_id: currId, to_id: friendId, from_name: fromUser.name, updated_at: now},
         $setOnInsert: {timestamp: now}},
         { upsert: true });
 
@@ -191,15 +193,15 @@ export const processFriendRequest = async (currId, friendId, accept) => {
     const request = await requestsCollection.findOne({from_id: friendId, to_id: currId});
     if (!request) throw "Error: request not found";
 
-    const fromUser = await usersCollection.findOne({id: currId});
-    const toUser = await usersCollection.findOne({id: friendId});
+    const fromUser = await usersCollection.findOne({_id: currId});
+    const toUser = await usersCollection.findOne({_id: friendId});
     if (!fromUser || !toUser) throw "Error: user not found";
 
     if (accept) {
         addFriend(currId, friendId); // updates both users
     }
     // Kill the request
-    await requestsCollection.deleteOne({from_id: request.fromId, to_id: request.to_id});
+    await requestsCollection.deleteOne({from_id: request.from_id, to_id: request.to_id});
     return true;
 
 };

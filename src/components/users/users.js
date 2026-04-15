@@ -3,12 +3,12 @@ import {users} from '../../../config/mongoCollections.js';
 
 export const createUser = async (uid, displayName) => {
     const usersCollection = await users();
-    const existingUser = await usersCollection.findOne({id: uid})
+    const existingUser = await usersCollection.findOne({_id: uid})
     if (existingUser) return existingUser;
 
     const newUser = {
-        id: uid,
-        username: displayName,
+        _id: uid,
+        name: displayName,
         friends: [],
         quiz_history: []
     }
@@ -18,6 +18,14 @@ export const createUser = async (uid, displayName) => {
     if (!addedUser) throw "Error: failed to add new user";
 
     return addedUser;
+}
+
+export const getUser = async (_id) => {
+    const usersCollection = await users();
+    const user = await usersCollection.findOne({_id})
+    if (user) return user;
+    else throw "Error: could not find user";
+
 }
 
 export const addQuizToHistory = async (currId, quizResult) => {
@@ -35,18 +43,18 @@ export const addQuizToHistory = async (currId, quizResult) => {
     }
     */
     const usersCollection = await users();
-    const user = await usersCollection.findOne({id: currId});
+    const user = await usersCollection.findOne({_id: currId});
     if (!user) throw "Error: user not found";
 
-    const moderator = await usersCollection.findOne({id: quiz.moderator_id});
+    const moderator = await usersCollection.findOne({_id: quiz.moderator_id});
     if (!moderator) throw "Error: moderator not found";
 
     // Add extra computed fields
     quizResult.timestamp = new Date();
-    quizResult.moderator_name = moderator.username;
+    quizResult.moderator_name = moderator.name;
 
     const newUser = await usersCollection.updateOne(
-        {id: currId},
+        {_id: currId},
         {$push: {quiz_history: quizResult}}
     );
 
