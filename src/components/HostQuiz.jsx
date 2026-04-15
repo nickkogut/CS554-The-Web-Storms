@@ -1,39 +1,18 @@
 import { Link } from "react-router-dom";
-import { useContext } from "react";
-import { AuthContext } from "../context/AuthContext";
-import './styles/hostquiz.css';
-import LogInButton from "./auth/LogInButton";
-import LogOutButton from "./auth/LogOutButton";
-
+import { Box, Button, Stack } from "@mui/material";
+import Navbar from "./Navbar";
 
 function HostQuiz(){
-  const {currentUser} = useContext(AuthContext);
 
   return (
-    <div className="host-container">
-        <div className="top-bar">
-            <div className="login">
-                {currentUser ? 
-
-                (
-                <LogOutButton/>
-                ) : 
-
-                (
-                <LogInButton/>
-                )
-                }
-            </div>
-            <Link className="host-home" to="/">Home</Link>
-        </div>
-        <div className="host-buttons">
-            <Link to="/my-quizzes" className="host-my">My Quizzes</Link>
-            <br></br>
-            <Link to ="/create-quiz" className="host-create">Create Quiz</Link>
-            <br></br>
-            <Link to="/search" className="host-search">Search Quizzes</Link>
-        </div>
-    </div>
+    <Box sx={{ display: "flex", flexDirection: "column", height: "75vh", fontFamily: "Gill Sans, sans-serif" }}>        
+        <Navbar/>
+        <Stack spacing={2} alignItems="center" sx={{ margin: "auto", mt: 10 }}>
+            <Button component={Link} to="/my-quizzes" variant="contained" size="large">My Quizzes</Button>
+            <Button component={Link} to ="/create-quiz" variant="contained" size="large">Create Quiz</Button>
+            <Button component={Link} to="/search" variant="contained" size="large">Search Quizzes</Button>
+        </Stack>
+    </Box>
   );
 }
 
