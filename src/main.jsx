@@ -6,10 +6,15 @@ import App from './App'
 
 import fbconfig from './firebase/FirebaseConfig';
 import { initializeApp } from "firebase/app";
+import { AuthProvider } from './context/AuthContext';
+import Navbar from './components/Navbar';
 const app = initializeApp(fbconfig);
 
 createRoot(document.getElementById('root')).render(
   <BrowserRouter>
-    <App />
+    <AuthProvider>
+      <Navbar />
+      <App />
+    </AuthProvider>
   </BrowserRouter>,
 )
