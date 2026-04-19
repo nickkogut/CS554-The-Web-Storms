@@ -2,11 +2,10 @@ import { GraphQLError } from 'graphql';
 import { ObjectId } from 'mongodb';
 
 import client from './config/redisClient.js';
-import { questions as questionCollection } from './config/mongoCollections.js';
+import { quizzes as quizCollection } from './config/mongoCollections.js';
 
-const CACHE_KEYS = {
-  questionsAll: 'questions'
-};
+const SESSION_TTL_SECONDS = 60 * 60 * 2; // 2 hours
+const SESSION_KEY = (code) => `session:${code.toUpperCase()}`;
 
 function ensureString(input, varName) {
   if (input === undefined || input === null) {
@@ -26,6 +25,11 @@ function ensureString(input, varName) {
     });
   }
   return value;
+}
+
+function ensureOptionalString(input, varName) {
+  if (input === undefined || input === null) return undefined;
+  return ensureString(input, varName);
 }
 
 function ensureQuestionInput(question, index) {
@@ -79,83 +83,138 @@ function toGraph(doc) {
   return copy;
 }
 
-async function getCached(key) {
-  try {
-    const raw = await client.get(key);
-    if (!raw) return null;
-    return JSON.parse(raw);
-  } catch (e) {
-    console.error('Redis GET error', e);
-    return null;
+function generateSessionCode(length = 10) {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let code = '';
+  for (let i = 0; i < length; i += 1) {
+    code += chars[Math.floor(Math.random() * chars.length)];
   }
+  return code;
 }
 
-async function setCached(key, value) {
-  try {
-    await client.set(key, JSON.stringify(value));
-  } catch (e) {
-    console.error('Redis SET error', e);
-  }
+async function getSessionFromRedis(code) {
+  const raw = await client.get(SESSION_KEY(code));
+  if (!raw) return null;
+  return JSON.parse(raw);
 }
 
-async function clearQuestionsCache() {
-  try {
-    await client.del(CACHE_KEYS.questionsAll);
-  } catch (e) {
-    console.error('Redis DEL error', e);
+async function saveSessionToRedis(session) {
+  await client.set(SESSION_KEY(session.code), JSON.stringify(session), {
+    EX: SESSION_TTL_SECONDS
+  });
+}
+
+async function buildUniqueSessionCode() {
+  for (let i = 0; i < 20; i += 1) {
+    const code = generateSessionCode(10);
+    const exists = await client.exists(SESSION_KEY(code));
+    if (!exists) return code;
   }
+
+  throw new GraphQLError('Could not generate a unique session code', {
+    extensions: { code: 'INTERNAL_SERVER_ERROR' }
+  });
 }
 
 export const resolvers = {
   Query: {
-    getQuestions: async () => {
-      const cached = await getCached(CACHE_KEYS.questionsAll);
-      if (cached) return cached;
-
-      const col = await questionCollection();
+    getQuizCatalog: async () => {
+      const col = await quizCollection();
       const docs = await col.find({}).sort({ createdAt: -1 }).toArray();
-      const result = docs.map(toGraph);
 
-      await setCached(CACHE_KEYS.questionsAll, result);
-      return result;
+      return docs.map((quiz) => ({
+        _id: quiz._id.toString(),
+        quizName: quiz.quizName,
+        createdBy: quiz.createdBy,
+        createdAt: quiz.createdAt,
+        questions: quiz.questions
+      }));
+    },
+
+    getQuizSessionByCode: async (_, args) => {
+      const code = ensureString(args.code, 'code').toUpperCase();
+      const session = await getSessionFromRedis(code);
+
+      if (!session) {
+        throw new GraphQLError('Session not found or expired', {
+          extensions: { code: 'NOT_FOUND' }
+        });
+      }
+
+      return session;
     }
   },
 
   Mutation: {
-    addQuestions: async (_, args) => {
-      if (!Array.isArray(args.questions) || args.questions.length === 0) {
+    createQuiz: async (_, args) => {
+      if (!args.quiz || typeof args.quiz !== 'object') {
+        throw new GraphQLError('quiz is required', {
+          extensions: { code: 'BAD_USER_INPUT' }
+        });
+      }
+
+      if (!Array.isArray(args.quiz.questions) || args.quiz.questions.length === 0) {
         throw new GraphQLError('questions must be a non-empty array', {
           extensions: { code: 'BAD_USER_INPUT' }
         });
       }
 
-      const normalized = args.questions.map((q, index) => ensureQuestionInput(q, index + 1));
-      const now = new Date().toISOString();
+      const quizName = ensureString(args.quiz.quizName, 'quizName');
+      const createdBy = ensureOptionalString(args.quiz.createdBy, 'createdBy') || 'Anonymous';
+      const normalizedQuestions = args.quiz.questions.map((q, index) =>
+        ensureQuestionInput(q, index + 1)
+      );
 
-      const docsToInsert = normalized.map((q) => ({
-        questionText: q.questionText,
-        options: q.options,
-        correctOption: q.correctOption,
-        createdAt: now
-      }));
+      const newDoc = {
+        quizName,
+        createdBy,
+        createdAt: new Date().toISOString(),
+        questions: normalizedQuestions
+      };
 
-      const col = await questionCollection();
-      const insertResult = await col.insertMany(docsToInsert);
+      const col = await quizCollection();
+      const insertResult = await col.insertOne(newDoc);
 
-      if (!insertResult || !insertResult.insertedIds) {
+      if (!insertResult?.insertedId) {
         throw new GraphQLError('Insert failed', {
           extensions: { code: 'INTERNAL_SERVER_ERROR' }
         });
       }
 
-      const insertedIds = Object.values(insertResult.insertedIds);
-      const insertedDocs = await col.find({ _id: { $in: insertedIds } }).toArray();
+      const created = await col.findOne({ _id: insertResult.insertedId });
+      return toGraph(created);
+    },
 
-      const byId = new Map(insertedDocs.map((doc) => [doc._id.toString(), toGraph(doc)]));
-      const ordered = insertedIds.map((id) => byId.get(id.toString())).filter(Boolean);
+    startQuizSession: async (_, args) => {
+      const quizId = ensureString(args.quizId, 'quizId');
 
-      await clearQuestionsCache();
-      return ordered;
+      let objectId;
+      try {
+        objectId = new ObjectId(quizId);
+      } catch {
+        throw new GraphQLError('quizId must be a valid quiz id', {
+          extensions: { code: 'BAD_USER_INPUT' }
+        });
+      }
+
+      const col = await quizCollection();
+      const quiz = await col.findOne({ _id: objectId });
+
+      if (!quiz) {
+        throw new GraphQLError('Quiz not found', {
+          extensions: { code: 'NOT_FOUND' }
+        });
+      }
+
+      const code = await buildUniqueSessionCode();
+      const session = {
+        code,
+        expiresAt: new Date(Date.now() + SESSION_TTL_SECONDS * 1000).toISOString(),
+        quiz: toGraph(quiz)
+      };
+
+      await saveSessionToRedis(session);
+      return session;
     }
   }
 };

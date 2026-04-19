@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useContext, useState } from 'react';
+import { useSnackbar } from 'notistack';
 
 import AppBar from '@mui/material/AppBar';
 import Box from '@mui/material/Box';
@@ -12,7 +13,6 @@ import Card from '@mui/material/Card';
 import CardContent from '@mui/material/CardContent';
 import Divider from '@mui/material/Divider';
 import TextField from '@mui/material/TextField';
-import Alert from '@mui/material/Alert';
 import FormControl from '@mui/material/FormControl';
 import FormLabel from '@mui/material/FormLabel';
 import RadioGroup from '@mui/material/RadioGroup';
@@ -23,6 +23,8 @@ import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import SendIcon from '@mui/icons-material/Send';
 import MenuIcon from '@mui/icons-material/Menu';
+
+import { AuthContext } from '../context/AuthContext';
 
 const GRAPHQL_URL = 'http://localhost:4000/';
 
@@ -43,9 +45,12 @@ function normalizeQuestions(questions) {
     }));
 }
 
-export default function ModeratorPage({ onSend }) {
+export default function ModeratorPage() {
+    const { currentUser } = useContext(AuthContext);
+    const { enqueueSnackbar } = useSnackbar();
+
+    const [quizName, setQuizName] = useState('');
     const [questions, setQuestions] = useState([createBlankQuestion()]);
-    const [status, setStatus] = useState({ type: 'info', message: '' });
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     const updateQuestionText = (questionId, value) => {
@@ -81,22 +86,26 @@ export default function ModeratorPage({ onSend }) {
 
     const buttonAddQuestion = () => {
         setQuestions((prev) => [...prev, createBlankQuestion()]);
-        setStatus({ type: 'info', message: 'New question added.' });
+        enqueueSnackbar('New question added.', { variant: 'info' });
     };
 
     const buttonDeleteQuestion = (questionId) => {
         setQuestions((prev) => {
             if (prev.length === 1) {
-                setStatus({ type: 'info', message: 'At least one question must remain.' });
-                return [createBlankQuestion()];
+                enqueueSnackbar('At least one question must remain.', { variant: 'warning' });
+                return prev;
             }
 
-            setStatus({ type: 'info', message: 'Question removed.' });
+            enqueueSnackbar('Question removed.', { variant: 'info' });
             return prev.filter((q) => q.id !== questionId);
         });
     };
 
     const validateQuestions = () => {
+        if (!quizName.trim()) {
+            throw new Error('Quiz name cannot be empty.');
+        }
+
         for (let i = 0; i < questions.length; i++) {
             const q = questions[i];
 
@@ -118,19 +127,23 @@ export default function ModeratorPage({ onSend }) {
 
     const buttonOnSend = async () => {
         try {
-            setStatus({ type: 'info', message: '' });
             validateQuestions();
 
             const payload = normalizeQuestions(questions);
 
             const mutation = `
-            mutation AddQuestions($questions: [QuestionInput!]!) {
-                addQuestions(questions: $questions) {
-                    _id
-                    questionText
-                }
+        mutation CreateQuiz($quiz: QuizInput!) {
+          createQuiz(quiz: $quiz) {
+            _id
+            quizName
+            createdBy
+            createdAt
+            questions {
+              questionText
             }
-        `;
+          }
+        }
+      `;
 
             setIsSubmitting(true);
 
@@ -142,27 +155,33 @@ export default function ModeratorPage({ onSend }) {
                 body: JSON.stringify({
                     query: mutation,
                     variables: {
-                        questions: payload
+                        quiz: {
+                            quizName: quizName.trim(),
+                            createdBy: currentUser?.displayName || currentUser?.email || 'Anonymous',
+                            questions: payload
+                        }
                     }
                 })
             });
 
             const result = await response.json();
+            if (!response.ok) {
+                throw new Error(result?.errors?.[0]?.message || 'Failed to send questions.');
+            }
 
-            if (result.errors) {
+            if (result.errors?.length) {
                 throw new Error(result.errors[0].message);
             }
 
-            setStatus({
-                type: 'success',
-                message: 'Questions sent successfully.'
+            enqueueSnackbar(`Quiz "${result.data.createQuiz.quizName}" saved successfully.`, {
+                variant: 'success'
             });
 
             setQuestions([createBlankQuestion()]);
+            setQuizName('');
         } catch (error) {
-            setStatus({
-                type: 'error',
-                message: error.message || 'Something went wrong.'
+            enqueueSnackbar(error.message || 'Something went wrong.', {
+                variant: 'error'
             });
         } finally {
             setIsSubmitting(false);
@@ -189,15 +208,22 @@ export default function ModeratorPage({ onSend }) {
                             Create Questions
                         </Typography>
                         <Typography variant="body1" color="text.secondary">
-                            Add questions, enter four options, choose the correct answer, and send them to the backend.
+                            Add a quiz name, enter four options, choose the correct answer, and send them to the backend.
                         </Typography>
                     </Box>
 
-                    {status.message ? (
-                        <Alert severity={status.type} variant="outlined">
-                            {status.message}
-                        </Alert>
-                    ) : null}
+
+                    <Card variant="outlined" sx={{ borderRadius: 3 }}>
+                        <CardContent>
+                            <TextField
+                                label="Quiz Name"
+                                value={quizName}
+                                onChange={(e) => setQuizName(e.target.value)}
+                                fullWidth
+                                required
+                            />
+                        </CardContent>
+                    </Card>
 
                     {questions.map((question, index) => (
                         <Card key={question.id} variant="outlined" sx={{ borderRadius: 3 }}>
@@ -299,6 +325,6 @@ export default function ModeratorPage({ onSend }) {
                     </Stack>
                 </Stack>
             </Container>
-        </Box>
+        </Box >
     );
 }
