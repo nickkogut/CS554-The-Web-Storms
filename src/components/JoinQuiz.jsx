@@ -1,18 +1,13 @@
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { useContext, useState } from "react";
 import { AuthContext } from "../context/AuthContext";
 import { gameSocket } from "../gameSocket";
-import "./styles/joinquiz.css"
-
-function EnterPIN(e){
-    e.preventDefault();
-    console.log("pin entered")
-}
+import { Box, Button, Stack, TextField, Alert } from "@mui/material";
 
 function JoinQuiz(){
   const {currentUser} = useContext(AuthContext);
   const [pin, setPin] = useState("");
-  cosnt [playerName, setPlayerName] = useState(
+  const [playerName, setPlayerName] = useState(
     currentUser?.displayName || ""
   );
   const [error, setError] = useState("");
@@ -52,47 +47,28 @@ function JoinQuiz(){
         }
     );
 }
-
   return (
-    <div className="join-container">
-        <div className="top-bar">
-            <div className="login">
-                {currentUser ? 
-
-                (
-                <Link className="login-text" to='/signout'>Sign Out</Link>
-                ) : 
-
-                (
-                <Link className="login-text" to='/login'>Log In</Link>
-                )
-                }
-            </div>
-            <Link className="join-home" to="/">Home</Link>
-        </div>
-        <div className="pin-section">
-            <form onSubmit={EnterPIN} className="pin-form">
-                <input
-                    className="pin-input"
-                    type="text"
-                    placeholder="Player Name"
+    <Box sx={{ display: "flex", flexDirection: "column", height: "75vh", fontFamily: "Gill Sans, sans-serif" }}> 
+        <form onSubmit={EnterPIN}>       
+            <Stack spacing={2} alignItems="center" sx={{ margin: "auto", mt: 10 }}>
+                <TextField onChange={(e) => setPlayerName(e.target.value)}
+                    label="Player Name"
+                    variant="outlined"
                     value={playerName}
-                    onChange={(e) => setPlayerName(e.target.value)}
-                ></input>
-                <input
-                    className="pin-input"
-                    type="text"
-                    placeholder="PIN"
+                />
+                <TextField onChange={(e) => setPin(e.target.value)}
+                    label="PIN"
+                    variant="outlined"
                     value={pin}
-                    onChange={(e) => setPin(e.target.value)}
-                ></input>
-                <button className="pin-button" type="submit" disabled={loading}>
+                />
+                <Button type="submit" variant="contained" disabled={loading}>
                     {loading ? "Joining..." : "Join Quiz"}
-                </button>
-                {error ? <p className="join-error">{error}</p> : null}
-            </form>
-        </div>
-    </div>
+                </Button>
+                {error && <Alert severity="error">{error}</Alert>}
+            </Stack>
+        </form>
+    </Box>
+
   );
 }
 

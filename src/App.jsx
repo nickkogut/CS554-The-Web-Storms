@@ -13,17 +13,19 @@ import ModeratorPage from './components/ModeratorPage';
 import HostQuiz from './components/HostQuiz.jsx';
 import HostRoom from './components/HostRoom.jsx';
 import PlayerRoom from './components/PlayerRoom.jsx';
+import Mailbox from './components/Mailbox.jsx';
+
+import QuizCatalog from './components/QuizCatalog.jsx';
 
 function App() {
   return (
     <AuthProvider>
       <Routes>
-        <Route path='/create-quiz' element={<ModeratorPage />}/>
+        <Route path='/create-quiz' element={<ModeratorPage />} />
+        <Route path='/login' element={<Login />} />
+        <Route path='/signup' element={<SignUp />} />
 
-          <Route path='/login' element={<Login/>} />
-          <Route path='/signup' element={<SignUp/>} />
-          
-          <Route path='/leaderboard' element={<Leaderboard/>} />
+        <Route path='/leaderboard' element={<Leaderboard />} />
 
           <Route path='/' element={<Dashboard/>}/>
           <Route path='/join' element={<JoinQuiz/>}/>
@@ -31,10 +33,14 @@ function App() {
           <Route path='/host-room/:roomId' element={<HostRoom/>}/>
           <Route path='/play/:roomId' element={<PlayerRoom/>}/>
 
-          <Route path='/logout' element={<LogOut />} /> {/* Temporary - This will just be accessed as a button on other pages */}
+        <Route path='/logout' element={<LogOut />} /> {/* Temporary - This will just be accessed as a button on other pages */}
 
-          <Route path='/change-password' element={<PrivateRoute />}/>
-          <Route path='/change-password' element={<ChangePassword />} />
+        <Route path='/change-password' element={<PrivateRoute />} />
+        <Route path='/change-password' element={<ChangePassword />} />
+
+        <Route path='/my-quizzes' element={<QuizCatalog />} />
+
+          <Route path='/test-mailbox' element={<Mailbox/>} />
 
       </Routes>
     </AuthProvider>

@@ -12,10 +12,14 @@ import {
   reauthenticateWithCredential
 } from 'firebase/auth';
 
+import {userAPI} from '../components/users/userAPI.js';
+
 async function createNewUserByEmail(email, password, username) {
     const auth = getAuth();
-    await createUserWithEmailAndPassword(auth, email, password);
-    await updateProfile(auth.currentUser, {displayName: username});
+    const newUser = await createUserWithEmailAndPassword(auth, email, password);
+    await updateProfile(newUser.user, {displayName: username});
+    await auth.currentUser.getIdToken(true); // Refresh to force the name update through
+    await userAPI.user.create();
 }
 
 async function changePassword(email, oldPassword, newPassword) {
@@ -23,7 +27,6 @@ async function changePassword(email, oldPassword, newPassword) {
   const auth = getAuth();
   let credential = EmailAuthProvider.credential(email, oldPassword);
   await reauthenticateWithCredential(auth.currentUser, credential);
-
   await updatePassword(auth.currentUser, newPassword);
   await logOut();
 }
@@ -32,6 +35,9 @@ async function loginGoogle() {
   let auth = getAuth();
   let socialProvider = new GoogleAuthProvider();
   await signInWithPopup(auth, socialProvider);
+  await updateProfile(auth.currentUser, {displayName: auth.currentUser.displayName || "Anonymous user"});
+  await auth.currentUser.getIdToken(true); // Refresh to force the name update through
+  await userAPI.user.create();
 }
 
 async function loginEmail(email, password) {

@@ -29,11 +29,15 @@ export const checkUsername = (username) => {
 
 export const setFBError = (e, setError) => {
     // Input: An FB error object or its message, and a setError function. Sets the error message to a more readable format.
-    if (typeof e !== "string") e = e.message;
-    e = e.trim();
-    e = e.split("(auth/")[1];
-    e = e.split(")")[0];
-    e = e.replaceAll("-", " ");
-    e = `Error: ${e.charAt(0).toUpperCase()}${e.slice(1)}.`;
+    try {
+        if (typeof e !== "string") e = e.message;
+        e = e.trim();
+        e = e.split("(auth/")[1];
+        e = e.split(")")[0];
+        e = e.replaceAll("-", " ");
+        e = `Error: ${e.charAt(0).toUpperCase()}${e.slice(1)}.`;
+    } catch (er) {
+        e = er;
+    }
     setError(e);
 }
