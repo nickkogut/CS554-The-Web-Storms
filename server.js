@@ -5,6 +5,7 @@ import { resolvers } from './resolvers.js';
 import { connectRedis } from './config/redisClient.js';
 import admin from './src/firebase/FirebaseAdmin.js';
 
+await connectRedis();
 
 const server = new ApolloServer({
   typeDefs,
