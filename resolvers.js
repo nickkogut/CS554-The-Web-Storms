@@ -3,6 +3,9 @@ import { ObjectId } from 'mongodb';
 
 import client from './config/redisClient.js';
 import { quizzes as quizCollection } from './config/mongoCollections.js';
+import { createUser, getUser, addQuizToHistory } from './src/components/users/users.js';
+import { getFriendRequestsForUser, addFriend, removeFriend, updateLastInteracted, blockUser, unblockUser, 
+  createFriendRequest, processFriendRequest } from './src/components/users/friendRequests.js';
 
 const SESSION_TTL_SECONDS = 60 * 60 * 2; // 2 hours
 const SESSION_KEY = (code) => `session:${code.toUpperCase()}`;
@@ -121,27 +124,10 @@ export const resolvers = {
     getQuizCatalog: async () => {
       const col = await quizCollection();
       const docs = await col.find({}).sort({ createdAt: -1 }).toArray();
+      const result = docs.map(toGraph);
 
-      return docs.map((quiz) => ({
-        _id: quiz._id.toString(),
-        quizName: quiz.quizName,
-        createdBy: quiz.createdBy,
-        createdAt: quiz.createdAt,
-        questions: quiz.questions
-      }));
-    },
-
-    getQuizSessionByCode: async (_, args) => {
-      const code = ensureString(args.code, 'code').toUpperCase();
-      const session = await getSessionFromRedis(code);
-
-      if (!session) {
-        throw new GraphQLError('Session not found or expired', {
-          extensions: { code: 'NOT_FOUND' }
-        });
-      }
-
-      return session;
+      await setCached(CACHE_KEYS.questionsAll, result);
+      return result;
     }
   },
 
@@ -213,8 +199,8 @@ export const resolvers = {
         quiz: toGraph(quiz)
       };
 
-      await saveSessionToRedis(session);
-      return session;
+      await clearQuestionsCache();
+      return ordered;
     }
   }
 };

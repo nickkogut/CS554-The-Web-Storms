@@ -62,12 +62,12 @@ function SignUp() {
 
           {error && <p className='auth-error'>{error}</p>}
 
-          <button className="auth-btn" type="submit">Create a New Account</button>
+          <div className="btn-shelf">
+            <button className="auth-btn" type="submit">Create a New Account</button>
+            <Link to="/login" className="auth-btn">Log in Instead</Link>
+            <GoogleLogin setError={setError} />
+          </div>
         </form>
-        <div className="btn-shelf">
-          <Link to="/login" className="auth-btn">Log in Instead</Link>
-          <GoogleLogin setError={setError} />
-        </div>
       </>
     );
   }

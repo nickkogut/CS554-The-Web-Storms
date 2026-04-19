@@ -35,6 +35,8 @@
     border: 1px solid black;
     border-radius: 8px;
     color: black;
+    background-color: rgb(220, 220, 220);
+    text-decoration: none;
 }
 
 .auth-btn:hover {
