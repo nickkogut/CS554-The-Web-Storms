@@ -9,6 +9,7 @@ function HostQuiz(){
             <Button component={Link} to="/my-quizzes" variant="contained" size="large">My Quizzes</Button>
             <Button component={Link} to ="/create-quiz" variant="contained" size="large">Create Quiz</Button>
             <Button component={Link} to="/search" variant="contained" size="large">Search Quizzes</Button>
+            <Button component={Link} to="/waiting-demo" variant="outlined" size="large">Waiting Room Demo</Button>
         </Stack>
     </Box>
   );

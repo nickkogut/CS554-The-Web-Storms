@@ -12,6 +12,7 @@ import JoinQuiz from './components/JoinQuiz.jsx';
 import ModeratorPage from './components/ModeratorPage';
 import HostQuiz from './components/HostQuiz.jsx';
 import Mailbox from './components/Mailbox.jsx';
+import WaitingRoomDemo from './components/WaitingRoomDemo';
 
 import QuizCatalog from './components/QuizCatalog.jsx';
 
@@ -35,6 +36,7 @@ function App() {
         <Route path='/change-password' element={<ChangePassword />} />
 
         <Route path='/my-quizzes' element={<QuizCatalog />} />
+        <Route path='/waiting-demo' element={<WaitingRoomDemo />} />
 
           <Route path='/test-mailbox' element={<Mailbox/>} />
 
