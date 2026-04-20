@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { gameSocket } from "../gameSocket";
-import "./styles/livequiz.css";
+import { Typography, Box, Button, TableContainer, TableCell, TableHead, TableRow, TableBody, Alert, Paper, Table } from "@mui/material";
 
 function HostRoom() {
   const { roomId } = useParams();
@@ -118,144 +118,136 @@ function HostRoom() {
   }
 
   return (
-    <div className="live-container">
-      <div className="top-bar">
-        <div className="login">
-          <Link className="login-text" to="/">Home</Link>
-        </div>
-        <div className="login">
-          <Link className="login-text" to="/create-quiz">Create Quiz</Link>
-        </div>
-      </div>
-
-      <div className="live-card">
-        <h1 className="live-title">Host Room</h1>
+    <Box sx={{ display: "flex", flexDirection: "column", minHeight: "75vh", fontFamily: "Gill Sans, sans-serif" }}>
+      <Box>
+        <Typography variant="h1">Host Room</Typography>
 
         {room ? (
           <>
-            <p className="live-text"><strong>PIN:</strong> {room.pin}</p>
-            <p className="live-text"><strong>Status:</strong> {room.status}</p>
-            <p className="live-text"><strong>Players Joined:</strong> {playerCount}</p>
+            <Typography variant="body1" fontWeight="bold">PIN: {room.pin}</Typography>
+            <Typography variant="body1" fontWeight="bold">Status: {room.status}</Typography>
+            <Typography variant="body1" fontWeight="bold">Players Joined: {playerCount}</Typography>
 
             {room.status === 'question' ? (
-              <p className="live-text"><strong>Time Left:</strong> {timeLeft}s</p>
+              <Typography variant="body1" fontWeight="bold">Time Left: {timeLeft}s</Typography>
             ) : null}
 
-            {error ? <p className="live-error">{error}</p> : null}
+            {error && <Alert severity="error">{error}</Alert>}
 
             {canStart ? (
-              <button
-                type="button"
-                className="live-main-button"
+              <Button
                 onClick={handleStartQuiz}
                 disabled={actionLoading}
+                variant="contained"
               >
                 {actionLoading ? 'Starting...' : 'Start Quiz'}
-              </button>
+              </Button>
             ) : null}
 
             {canNext ? (
-              <button
-                type="button"
-                className="live-main-button live-secondary-button"
+              <Button
+                variant="contained"
                 onClick={handleNextQuestion}
                 disabled={actionLoading}
               >
                 {actionLoading ? 'Loading...' : 'Next Question'}
-              </button>
+              </Button>
             ) : null}
 
             {finalResult ? (
-              <button
-                type="button"
-                className="live-main-button"
+              <Button
+                variant="contained"
                 onClick={goToLeaderboard}
               >
                 Open Leaderboard
-              </button>
+              </Button>
             ) : null}
           </>
         ) : (
-          <p className="live-text">Loading room...</p>
+          <Typography variant="body1">Loading room...</Typography>
         )}
-      </div>
+      </Box>
 
       {question ? (
-        <div className="live-card">
-          <h2 className="live-subtitle">
+        <Box>
+          <Typography variant="h2">
             Question {question.questionIndex + 1} of {question.totalQuestions}
-          </h2>
-          <p className="live-question">{question.questionText}</p>
+          </Typography>
+          <Typography variant="body1">{question.questionText}</Typography>
 
-          <div className="live-options">
+          <Box>
             {question.options.map((option, index) => (
-              <div className="live-option-box" key={index}>
+              <Box key={index}>
                 {index + 1}. {option}
-              </div>
+              </Box>
             ))}
-          </div>
-        </div>
+          </Box>
+        </Box>
       ) : null}
 
       {room?.players?.length ? (
-        <div className="live-card">
-          <h2 className="live-subtitle">Players</h2>
+        <Box>
+          <Typography variant="h2">Players</Typography>
 
-          <div className="live-table-wrapper">
-            <table className="live-table">
-              <thead>
-                <tr>
-                  <th>#</th>
-                  <th>Name</th>
-                  <th>Score</th>
-                  <th>Connected</th>
-                  <th>Answered</th>
-                </tr>
-              </thead>
-              <tbody>
+          <Box>
+            <TableContainer component={Paper}>
+              <Table>
+                <TableHead>
+                  <TableRow>
+                    <TableCell>#</TableCell>
+                    <TableCell>Name</TableCell>
+                    <TableCell>Score</TableCell>
+                    <TableCell>Connected</TableCell>
+                    <TableCell>Answered</TableCell>
+                  </TableRow>
+                </TableHead>
+              <TableBody>
                 {room.players.map((player, index) => (
-                  <tr key={player.playerId}>
-                    <td>{index + 1}</td>
-                    <td>{player.name}</td>
-                    <td>{player.score}</td>
-                    <td>{player.connected ? "Yes" : "No"}</td>
-                    <td>{player.answeredCurrentQuestion ? "Yes" : "No"}</td>
-                  </tr>
+                  <TableRow key={player.playerId}>
+                    <TableCell>{index + 1}</TableCell>
+                    <TableCell>{player.name}</TableCell>
+                    <TableCell>{player.score}</TableCell>
+                    <TableCell>{player.connected ? "Yes" : "No"}</TableCell>
+                    <TableCell>{player.answeredCurrentQuestion ? "Yes" : "No"}</TableCell>
+                  </TableRow>
                 ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+              </TableBody>
+              </Table>
+            </TableContainer>
+          </Box>
+        </Box>
       ) : null}
 
       {questionClosed ? (
-        <div className="live-card">
-          <h2 className="live-subtitle">Round Result</h2>
-          <p className="live-text">
+        <Box>
+          <Typography variant="h2">Round Result</Typography>
+          <Typography variant="body1">
             <strong>Correct Option:</strong> Option {questionClosed.correctOption + 1}
-          </p>
+          </Typography>
 
-          <div className="live-table-wrapper">
-            <table className="live-table">
-              <thead>
-                <tr>
-                  <th>Option</th>
-                  <th>Votes</th>
-                </tr>
-              </thead>
-              <tbody>
-                {questionClosed.answerStats.map((count, index) => (
-                  <tr key={index}>
-                    <td>Option {index + 1}</td>
-                    <td>{count}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+          <Box>
+            <TableContainer component={Paper}>
+              <Table>
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Option</TableCell>
+                    <TableCell>Votes</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {questionClosed.answerStats.map((count, index) => (
+                    <TableRow key={index}>
+                      <TableCell>Option {index + 1}</TableCell>
+                      <TableCell>{count}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </Box>
+        </Box>
       ) : null}
-    </div>
+    </Box>
   );
 }
 

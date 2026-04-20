@@ -10,8 +10,6 @@ import { meta } from 'eslint-plugin-react-hooks';
 import { questions as questionCollection } from './config/mongoCollections.js';
 import admin from './src/firebase/FirebaseAdmin.js';
 
-await connectRedis();
-
 const GRAPHQL_PORT = Number(process.env.PORT) || 4000;
 const SOCKET_PORT = Number(process.env.SOCKET_PORT) || 4001;
 const QUESTION_TIME_LIMIT_MS = 15000;
@@ -20,11 +18,6 @@ const DEFAULT_QUESTION_COUNT = 5;
 const rooms = new Map();
 const pinToRoomId = new Map();
 const socketMeta = new Map();
-const server = new ApolloServer({
-  typeDefs,
-  resolvers,
-   
-});
 
 function createRoomId() {
   return crypto.randomUUID();
@@ -44,7 +37,7 @@ function ensureString(value, fieldName){
   }
   value = value.trim();
   if(!value){
-    throw new Error(`${filedName} cannot be empty`);
+    throw new Error(`${fieldName} cannot be empty`);
   }
   return value;
 }
@@ -64,7 +57,7 @@ function getRoomByPin(pin){
   return rooms.get(roomId) || null;
 }
 
-function getPublicPLayers(room){
+function getPublicPlayers(room){
   return sortPlayers(room.players).map((player, index) => {
     return{
       rank: index+1,
@@ -72,7 +65,7 @@ function getPublicPLayers(room){
       name: player.name,
       score: player.score,
       connected: player.connected,
-      answeredCurrentQuestion: room.status === 'question' ? room.answer.has(player.playerId) : false
+      answeredCurrentQuestion: room.status === 'question' ? room.answers.has(player.playerId) : false
     };
   });
 }
@@ -86,8 +79,8 @@ function getRoomSnapshot(room){
     currentQuestionIndex: room.currentQuestionIndex,
     totalQuestions: room.questions.length,
     questionEndsAt: room.questionEndsAt,
-    players: getPublicPLayers(room),
-    leaderboard: getPublicPLayers(room),
+    players: getPublicPlayers(room),
+    leaderboard: getPublicPlayers(room),
     latestQuestionResult: room.latestQuestionResult || null
   };
 }

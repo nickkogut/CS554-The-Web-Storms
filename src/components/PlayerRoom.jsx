@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { gameSocket } from "../gameSocket";
-import "./styles/livequiz.css";
 
 function PlayerRoom(){
   const { roomId } = useParams();
