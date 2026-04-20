@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { gameSocket } from "../gameSocket";
+import { TableBody, TableCell, TableContainer, TableHead, TableRow, Typography, Box, Alert, Button, Table, Paper } from "@mui/material";
 
 function PlayerRoom(){
   const { roomId } = useParams();
@@ -135,49 +136,37 @@ function PlayerRoom(){
   }
 
   return (
-    <div className="live-container">
-      <div className="top-bar">
-        <div className="login">
-          <Link className="login-text" to="/">Home</Link>
-        </div>
-      </div>
-
-      <div className="live-card">
-        <h1 className="live-title">Player Room</h1>
+    <Box sx={{ display: "flex", flexDirection: "column", minHeight: "75vh", fontFamily: "Gill Sans, sans-serif" }}>
+      <Box>
+        <Typography variant="h1">Player Room</Typography>
 
         {room ? (
           <>
-            <p className="live-text"><strong>PIN:</strong> {room.pin}</p>
-            <p className="live-text"><strong>Status:</strong> {room.status}</p>
-            <p className="live-text"><strong>Your Score:</strong> {me ? me.score : 0}</p>
+            <Typography variant="body1" fontWeight="bold">PIN: {room.pin}</Typography>
+            <Typography variant="body1" fontWeight="bold">Status: {room.status}</Typography>
+            <Typography variant="body1" fontWeight="bold">Your Score: {me ? me.score : 0}</Typography>
             {room.status === 'question' ? (
-              <p className="live-text"><strong>Time Left:</strong> {timeLeft}s</p>
+              <Typography variant="body1" fontWeight="bold">Time Left: {timeLeft}s</Typography>
             ) : null}
           </>
         ) : (
-          <p className="live-text">Connecting...</p>
+          <Typography variant="body1">Connecting...</Typography>
         )}
 
-        {error ? <p className="live-error">{error}</p> : null}
-      </div>
+        {error && <Alert severity="error">{error}</Alert>}
+      </Box>
 
       {question ? (
-        <div className="live-card">
-          <h2 className="live-subtitle">
+        <Box>
+          <Typography variant="h2">
             Question {question.questionIndex + 1} of {question.totalQuestions}
-          </h2>
-          <p className="live-question">{question.questionText}</p>
+          </Typography>
+          <Typography variant="body1">{question.questionText}</Typography>
 
-          <div className="live-options">
+          <Box>
             {question.options.map((option, index) => (
-              <button
-                type="button"
+              <Button
                 key={index}
-                className={
-                  selectedOption === index
-                    ? "live-answer-button live-answer-selected"
-                    : "live-answer-button"
-                }
                 onClick={() => {
                   if(!submitted){
                     setSelectedOption(index);
@@ -186,75 +175,72 @@ function PlayerRoom(){
                 disabled={submitted}
               >
                 {index + 1}. {option}
-              </button>
+              </Button>
             ))}
-          </div>
+          </Box>
 
-          <button
-            type="button"
-            className="live-main-button"
+          <Button
             onClick={submitAnswer}
             disabled={submitted}
+            variant="contained"
           >
             {submitted ? "Answer Submitted" : "Submit Answer"}
-          </button>
-        </div>
+          </Button>
+        </Box>
       ) : null}
 
       {questionClosed ? (
-        <div className="live-card">
-          <h2 className="live-subtitle">Round Result</h2>
-          <p className="live-text">
+        <Box>
+          <Typography variant="h2">Round Result</Typography>
+          <Typography variant="body1">
             <strong>Correct Option:</strong> Option {questionClosed.correctOption + 1}
-          </p>
-          <p className="live-text">
+          </Typography>
+          <Typography variant="body1">
             {selectedOption === questionClosed.correctOption
               ? "You got it right."
               : "You got it wrong."}
-          </p>
-        </div>
+          </Typography>
+        </Box>
       ) : null}
 
       {room?.leaderboard?.length ? (
-        <div className="live-card">
-          <h2 className="live-subtitle">Live Leaderboard</h2>
+        <Box>
+          <Typography variant="h2">Live Leaderboard</Typography>
 
-          <div className="live-table-wrapper">
-            <table className="live-table">
-              <thead>
+          <TableContainer>
+            <Table>
+              <TableHead>
                 <tr>
                   <th>#</th>
                   <th>Player</th>
                   <th>Score</th>
                 </tr>
-              </thead>
-              <tbody>
+              </TableHead>
+              <TableBody>
                 {room.leaderboard.map((player) => (
-                  <tr key={player.playerId}>
-                    <td>{player.rank}</td>
-                    <td>{player.name}</td>
-                    <td>{player.score}</td>
-                  </tr>
+                  <TableRow key={player.playerId}>
+                    <TableCell>{player.rank}</TableCell>
+                    <TableCell>{player.name}</TableCell>
+                    <TableCell>{player.score}</TableCell>
+                  </TableRow>
                 ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </Box>
       ) : null}
 
       {finalResult ? (
-        <div className="live-card">
-          <h2 className="live-subtitle">Quiz Finished</h2>
-          <button
-            type="button"
-            className="live-main-button"
+        <Box>
+          <Typography variant="h2">Quiz Finished</Typography>
+          <Button
             onClick={openLeaderboard}
           >
             Open Final Leaderboard
-          </button>
-        </div>
+          </Button>
+        </Box>
       ) : null}
-    </div>
+    </Box>
   );
 }
 

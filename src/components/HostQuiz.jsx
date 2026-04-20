@@ -14,6 +14,7 @@ function HostQuiz(){
   const createLiveRoom = () => {
     setError("");
     setLoading(true);
+    console.log('socket connected:', gameSocket.connected);
     if(!gameSocket.connected){
       gameSocket.connect();
     }
@@ -22,6 +23,7 @@ function HostQuiz(){
       hostName,
       questionCount: 5
     }, (response) => {
+      console.log('create_room response:', response);
       setLoading(false);
       if(!response?.ok){
         setError(response?.error || "Could not create room");
@@ -36,13 +38,11 @@ function HostQuiz(){
   return (
     <Box sx={{ display: "flex", flexDirection: "column", height: "75vh", fontFamily: "Gill Sans, sans-serif" }}>        
         <Stack spacing={2} alignItems="center" sx={{ margin: "auto", mt: 10 }}>
-            {/* <button
-              type="button"
-              className="host-create host-button-reset"
+            <Button
               onClick={createLiveRoom}
               disabled={loading} >
                 {loading ? "Creating..." : "Start Live Quiz"}
-            </button> */}
+            </Button>
             <Button component={Link} to="/my-quizzes" variant="contained" size="large">My Quizzes</Button>
             <Button component={Link} to ="/create-quiz" variant="contained" size="large">Create Quiz</Button>
             <Button component={Link} to="/search" variant="contained" size="large">Search Quizzes</Button>

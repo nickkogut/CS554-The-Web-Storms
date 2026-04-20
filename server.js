@@ -2,11 +2,11 @@ import { ApolloServer } from '@apollo/server';
 import { startStandaloneServer } from '@apollo/server/standalone';
 import { Server } from 'socket.io';
 import crypto from 'crypto';
+import {createServer} from 'http';
 
 import { typeDefs } from './typeDefs.js';
 import { resolvers } from './resolvers.js';
 import { connectRedis } from './config/redisClient.js';
-import { meta } from 'eslint-plugin-react-hooks';
 import { questions as questionCollection } from './config/mongoCollections.js';
 import admin from './src/firebase/FirebaseAdmin.js';
 
@@ -212,9 +212,16 @@ function startQuestion(io, room){
 }
 
 await connectRedis();
+
 const apolloServer = new ApolloServer({ typeDefs, resolvers });
 
-const { url } = await startStandaloneServer(server, {
+const httpServer = createServer();
+const io = new Server(httpServer, {cors: {origin: '*'}});
+httpServer.listen(SOCKET_PORT, () => {
+  console.log(`🚀 Socket.io ready on port ${SOCKET_PORT}`);
+});
+
+const { url } = await startStandaloneServer(apolloServer, {
   listen: { port: 4000 },
   context: async ({ req, res }) => {
     const authHeader = req.headers.authorization || "";
@@ -232,10 +239,8 @@ const { url } = await startStandaloneServer(server, {
       return { user: null };
     }
   }
-  
 });
-
-console.log(`🚀 Server ready at: ${url}`);
+console.log(`🚀 GraphQL ready at: ${url}`);
 
 io.on('connection', (socket) => {
   socket.on('create_room', async (payload, callback) => {
