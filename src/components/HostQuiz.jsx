@@ -1,11 +1,8 @@
-import { Link, useNavigate } from "react-router-dom";
-import { useContext, useState } from "react";
-import { AuthContext } from "../context/AuthContext";
-import { gameSocket } from "../gameSocket";
+import { Link } from "react-router-dom";
 import { Box, Button, Stack } from "@mui/material";
 
-
 function HostQuiz(){
+<<<<<<< HEAD
   const {currentUser} = useContext(AuthContext);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -34,18 +31,24 @@ function HostQuiz(){
   );
 };
 
+=======
+>>>>>>> 87913bda56972318c27b62fc5cd952c9f44a9d7f
 
   return (
     <Box sx={{ display: "flex", flexDirection: "column", height: "75vh", fontFamily: "Gill Sans, sans-serif" }}>        
         <Stack spacing={2} alignItems="center" sx={{ margin: "auto", mt: 10 }}>
+<<<<<<< HEAD
             <Button
               onClick={createLiveRoom}
               disabled={loading} >
                 {loading ? "Creating..." : "Start Live Quiz"}
             </Button>
+=======
+>>>>>>> 87913bda56972318c27b62fc5cd952c9f44a9d7f
             <Button component={Link} to="/my-quizzes" variant="contained" size="large">My Quizzes</Button>
             <Button component={Link} to ="/create-quiz" variant="contained" size="large">Create Quiz</Button>
             <Button component={Link} to="/search" variant="contained" size="large">Search Quizzes</Button>
+            <Button component={Link} to="/waiting-demo" variant="outlined" size="large">Waiting Room Demo</Button>
         </Stack>
     </Box>
   );
