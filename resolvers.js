@@ -300,8 +300,8 @@ export const resolvers = {
   processFriendRequest: async (_, {friendId, accept}, context) => {
     if (!context.user) throw new GraphQLError("Not authenticated");
 
-    await processFriendRequest(context.user.uid, friendId, accept);
-    return true;
+    const friend = await processFriendRequest(context.user.uid, friendId, accept);
+    return friend;
   },
 
   }

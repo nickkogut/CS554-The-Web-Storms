@@ -69,8 +69,10 @@ export const Mailbox = () => {
 
   const handleAccept = async (fromId) => {
     try {
-      await userAPI.friend.processRequest(fromId, true);
+      const processData = await userAPI.friend.processRequest(fromId, true);
+      const newFriend = processData.data.processFriendRequest;
       setFriendRequests((prev) => prev.filter((r) => r.from_id !== fromId));
+      setFriends((prev) => [newFriend, ...prev]);
     } catch (err) {
       setError("Failed to accept request");
     }
@@ -128,10 +130,10 @@ export const Mailbox = () => {
           
           {friendRequests.length > 0 && (
             [...friendRequests] // Cannot sort friendRequests itself
-            .sort((r1, r2) => {return Number(r1.timestamp) - Number(r2.timestamp)})
+            .sort((r1, r2) => {return Number(r2.timestamp) - Number(r1.timestamp)})
             .map((req) => (
               <ListItem
-                key={req.from_id}
+                key={`request-${req.from_id}`}
                 disableGutters
                 secondaryAction={
                   <>
@@ -172,7 +174,7 @@ export const Mailbox = () => {
 
           {(friendRequests.length > 0 && friends.length > 0) 
           ? (<Divider/>) 
-          : (<ListItem><ListItemText 
+          : ((friendRequests.length == 0 && friends.length == 0) &&<ListItem><ListItemText 
                   primary="No friend activity yet" 
                   primaryTypographyProps={{
                     color: "black", 
@@ -183,9 +185,9 @@ export const Mailbox = () => {
 
           {friends.length > 0 && (
             [...friends] // Cannot sort friends itself
-              .sort((f1, f2) => {return Number(f1.lastInteracted) - Number(f2.lastInteracted)})
+              .sort((f1, f2) => {return Number(f2.lastInteracted) - Number(f1.lastInteracted)})
               .map((friend) => (
-              <ListItem key={friend._id}
+              <ListItem key={`friend-${friend._id}`}
               disableGutters
               secondaryAction={
               /* 
@@ -204,17 +206,14 @@ export const Mailbox = () => {
                     <IconButton onClick={() => {/* TODO: Join their game - gold if they invited you*/}}>
                       <SportsEsportsIcon/>
                     </IconButton>
-
-                    {/* <Icon > TODO: Red if in a game, gray if offline - don't show otherwise
-                      <DoNotDisturbOnIcon sx={{color: "gray", fontSize: 24}} />
-                    </Icon> */}
+                    {}
                     <Box sx={{
                         display: "inline-flex",
                         alignItems: "center",
                         verticalAlign: "middle",
                       }}
                     >
-                      <DoNotDisturbOnIcon sx={{fontSize: 24, color: "gray"}} />
+                      <DoNotDisturbOnIcon sx={{fontSize: 24, color: "gray" /* TODO: Red if in a game, gray if offline - don't show otherwise*/}} />
                     </Box>
                     
                     <IconButton>

@@ -14,12 +14,13 @@ const makeUsers = async (names) => {
 }
 
 const generateFriendRequests = async (users) => {
-    createFriendRequest(users[3]._id, users[0]._id) // from, to
+    await createFriendRequest(users[3]._id, users[0]._id); // from, to
+    await createFriendRequest(users[4]._id, users[0]._id);
 }
 
 const generateFriends = async (users) => {
-    await addFriend(users[1]._id, users[0]._id) // from, to
-    await addFriend(users[2]._id, users[0]._id)
+    await addFriend(users[1]._id, users[0]._id); // from, to
+    await addFriend(users[2]._id, users[0]._id);
 }
 
 const main = async () => {
@@ -41,17 +42,17 @@ const main = async () => {
     let fb_user;
     try {
         // Check if user has already been added to firebase (which is global across anyone who runs this seed file)
-        fb_user = await admin.auth().getUserByEmail("abd@def.ghi");
+        fb_user = await admin.auth().getUserByEmail("abc@def.ghi");
     } catch (e) {
         fb_user = await admin.auth().createUser({
-        email: "abd@def.ghi",
+        email: "abc@def.ghi",
         password: "TestPass123!",
         displayName: "Test User"
         });
     }
     const testUser = await createUser(fb_user.uid, fb_user.displayName);
 
-    const names = ["other user 1", "other user 2", "other user 3", "other user 4"];
+    const names = ["other user 1", "other user 2", "other user 3", "other user 4", "other user 5"];
     const createdUsers = [testUser, ...await makeUsers(names)];
     await generateFriendRequests(createdUsers);
     await generateFriends(createdUsers);

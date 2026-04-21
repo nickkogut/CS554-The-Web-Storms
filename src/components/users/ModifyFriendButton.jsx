@@ -16,7 +16,7 @@ const ModifyFriendButton = ({id, name, handler, actionName, icon}) => {
   };
   
   const callHandler = async () => {
-    handler(id);
+    await handler(id);
     setOpen(false);
   }
 
