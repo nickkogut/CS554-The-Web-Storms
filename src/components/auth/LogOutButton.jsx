@@ -1,7 +1,7 @@
 import React, {useContext} from 'react';
 import {useNavigate} from 'react-router-dom';
 import {logOut} from '../../firebase/FirebaseFunctions';
-import './auth.css';
+// import './auth.css';
 import Button from '@mui/material/Button';
 import Dialog from '@mui/material/Dialog';
 import DialogActions from '@mui/material/DialogActions';
@@ -27,7 +27,7 @@ const LogOutButton = () => {
 
     return (
     <React.Fragment>
-      <Button onClick={handleClickOpen}>Log Out</Button>
+      <Button sx={{ ml:"auto" }} color="secondary" variant="contained" size="small" onClick={handleClickOpen}>Log Out</Button>
       <Dialog
         open={open}
         onClose={handleClose}

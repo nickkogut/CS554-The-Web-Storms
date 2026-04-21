@@ -30,6 +30,7 @@ export const addFriend = async (currId, friendId) => {
         { $push: 
             { friends: {
             _id: currId,
+            name: user.name,
             friendTimestamp: now,
             lastInteracted: now
         }}}

@@ -17,7 +17,7 @@ export const createUser = async (uid, displayName) => {
     const addedUser = await usersCollection.insertOne(newUser);
     if (!addedUser) throw "Error: failed to add new user";
 
-    return addedUser;
+    return newUser;
 }
 
 export const getUser = async (_id) => {
