@@ -1,5 +1,9 @@
 import { Link } from "react-router-dom";
 import { Box, Button, Stack } from "@mui/material";
+import { useContext, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { AuthContext } from "../context/AuthContext";
+import { gameSocket } from "../../socket.js";
 
 function HostQuiz(){
   const {currentUser} = useContext(AuthContext);
