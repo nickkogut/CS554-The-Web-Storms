@@ -9,6 +9,8 @@ import App from './App'
 
 import fbconfig from './firebase/FirebaseConfig';
 import { initializeApp } from "firebase/app";
+import { AuthProvider } from './context/AuthContext';
+import Navbar from './components/Navbar';
 const app = initializeApp(fbconfig);
 
 function SlideTransition(props) {
@@ -18,15 +20,18 @@ function SlideTransition(props) {
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <BrowserRouter>
-      <SnackbarProvider
-        maxSnack={3}
-        autoHideDuration={3000}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-        TransitionComponent={SlideTransition}
-        preventDuplicate
-      >
-        <App />
-      </SnackbarProvider>
+      <AuthProvider>
+        <SnackbarProvider
+          maxSnack={3}
+          autoHideDuration={3000}
+          anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+          TransitionComponent={SlideTransition}
+          preventDuplicate
+        >
+          <Navbar />
+          <App />
+        </SnackbarProvider>
+      </AuthProvider>
     </BrowserRouter>
   </StrictMode>
 )
