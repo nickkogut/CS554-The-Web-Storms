@@ -9,6 +9,7 @@ import { resolvers } from './resolvers.js';
 import { connectRedis } from './config/redisClient.js';
 import { questions as questionCollection } from './config/mongoCollections.js';
 import admin from './src/firebase/FirebaseAdmin.js';
+import { getUser } from './src/components/users/users.js';
 
 const GRAPHQL_PORT = Number(process.env.PORT) || 4000;
 const SOCKET_PORT = Number(process.env.SOCKET_PORT) || 4001;
@@ -18,6 +19,79 @@ const DEFAULT_QUESTION_COUNT = 5;
 const rooms = new Map();
 const pinToRoomId = new Map();
 const socketMeta = new Map();
+
+const userStatusMap = new Map(); // The status of all logged in users, used to initialize the mailbox of a new user when they first log in
+const disconnectingUsers = {};
+
+const notifyFriends = async (uid, status) => {
+  const user = await getUser(uid);
+  if (!user) return;
+  const friends = user.friends.map((friend) => friend._id);
+  friends.forEach(friendId => {
+    if (userStatusMap[friendId]) {
+      io.to(friendId).emit('friendsUpdate', {uid, status});
+    }
+  })
+}
+
+const initStatuses = (uid, friend_ids) => {
+  // Give users the initial statuses of all friends
+  const statuses = {};
+  if (!friend_ids) return;
+  friend_ids.forEach((friend) => {
+    if (userStatusMap[friend]) {
+      statuses[friend] = userStatusMap[friend];
+    }
+  })
+  console.log("DEBUG - emitting statuses, ", statuses, uid) // DEBUG
+  io.to(uid).emit('initStatuses', statuses);
+};
+
+
+const changeStatus = async (uid, newStatus) => {
+  console.log("changing status ", uid, newStatus)
+  console.log(JSON.stringify(userStatusMap));
+  if (disconnectingUsers[uid]) { // Hold disconnect requests for a few seconds to prevent a refresh triggering them
+    clearTimeout(disconnectingUsers[uid]);
+    delete disconnectingUsers[uid];
+  }
+
+  let status; // The status object that will be emitted to friends / stored in userStatusMap
+  
+  switch(newStatus) {
+    case "online":
+      status = {status: "online"};
+      const alreadyOnline = (uid in userStatusMap);
+      userStatusMap[uid] = status;
+      if (!alreadyOnline) {
+        notifyFriends(uid, status);
+      }
+      
+      break;
+    case "offline":
+      status = {status: "offline"}
+      disconnectingUsers[uid] = setTimeout(() => {
+        const wasDeleted = delete userStatusMap[uid];
+        
+        if (wasDeleted) {
+          notifyFriends(uid, status);
+        }
+      }, 2000)
+      break;
+    
+    case "busy":
+      status = {status: "busy"}
+      userStatusMap[uid] = status;
+      notifyFriends(uid, status);
+      break;
+    
+    default:
+      // newStatus holds the lobby id/pin
+      status = {status: "in-lobby", code: newStatus}
+      userStatusMap[uid] = status;
+      notifyFriends(uid, status);
+  }
+};
 
 function createRoomId() {
   return crypto.randomUUID();
@@ -285,10 +359,10 @@ io.on('connection', (socket) => {
       callback?.({
         ok: false,
         error: e.message || 'Unable to create room'
-      });
-    }
+    });
+  }
   });
-  
+
   socket.on('watch_room', (payload, callback) => {
     try{
       const roomId = ensureString(payload?.roomId, 'Room ID');
@@ -312,7 +386,7 @@ io.on('connection', (socket) => {
       });
     }
   });
-  
+
   socket.on('join_room', (payload, callback) => {
     try{
       const pin = ensureString(payload?.pin, 'PIN');
@@ -354,8 +428,9 @@ io.on('connection', (socket) => {
       callback?.({ ok: false, error: e.message || 'Unable to join room'});
     }
   });
-  
+    
   socket.on('player_reconnect', (payload, callback) => {
+    console.log("DEBUG ==== RECONNECTED TO SOCKET")
     try{
       const roomId = ensureString(payload?.roomId, 'Room ID');
       const playerId = ensureString(payload?.playerId, 'Player ID');
@@ -474,8 +549,26 @@ io.on('connection', (socket) => {
     }
     catch(e){
       callback?.({ ok: false, error: e.message || 'Unable to move to next question' });
-    }
+    }});
+
+  socket.on('joinPersonalRoom', ({ uid }) => { // For friends notifications
+    socket.join(uid);
   });
+
+  socket.on('leavePersonalRoom', ({ uid }) => {
+    socket.leave(uid);
+  });
+
+  socket.on('changeStatus', async (data) => {
+    const uid = data.uid;
+    const newStatus = data.status;
+    await changeStatus(uid, newStatus);
+  });
+
+  socket.on('initStatuses', ({uid, friend_ids}) => {
+    initStatuses(uid, friend_ids);
+  });
+
   socket.on('disconnect', () => {
     const meta = socketMeta.get(socket.id);
     clearSocketMeta(socket.id);
@@ -493,6 +586,7 @@ io.on('connection', (socket) => {
         player.connected = false;
       }
     }
+
     emitRoomSnapshot(io, room);
   });
 });

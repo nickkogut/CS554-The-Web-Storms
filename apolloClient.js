@@ -1,13 +1,12 @@
 import { ApolloClient, InMemoryCache, HttpLink } from '@apollo/client';
 import { setContext } from '@apollo/client/link/context';
-import { getAuth } from 'firebase/auth';
+import {auth} from "./src/firebase/FirebaseConfig.js";
 
 const httpLink = new HttpLink({
   uri: 'http://localhost:4000/',
 });
 
 const authLink = setContext(async (_, { headers }) => {
-  const auth = getAuth();
   let token = null;
 
   if (auth.currentUser) {
