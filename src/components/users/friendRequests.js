@@ -104,8 +104,8 @@ const isBlocked = async (id1, id2) => {
               {blocker_id: id2, blocked_id: id1}]}).toArray();
 
     return {
-        id1: blocked.some(b => b.blocker_id === id1 && b.blocked_id === id2),
-        id2: blocked.some(b => b.blocker_id === id2 && b.blocked_id === id1),
+        [id1]: blocked.some(b => b.blocker_id === id1 && b.blocked_id === id2),
+        [id2]: blocked.some(b => b.blocker_id === id2 && b.blocked_id === id1),
     };
 };
 
@@ -158,6 +158,7 @@ export const unblockUser = async (currId, blockedId) => {
 }
 
 export const createFriendRequest = async (currId, friendId) => {
+    // Returns true if a NEW request was created, false if it was updated or not created
     const usersCollection = await users();
     const requestsCollection = await friend_requests();
 
@@ -165,10 +166,10 @@ export const createFriendRequest = async (currId, friendId) => {
     const fromUser = await usersCollection.findOne({_id: currId});
     const toUser = await usersCollection.findOne({_id: friendId});
     if (!fromUser || !toUser) throw "Error: failed to locate both users";
-    if (fromUser.friends.find(f => f.id === friendId)) throw "Error: you are already friends";
+    if (fromUser.friends.find(f => f._id === friendId)) throw "Error: you are already friends";
 
-    const blocked = isBlocked(currId, friendId);
-    if (blocked[friendId]) return; // Just kill the request. Don't tell the sender that they are blocked
+    const blocked = await isBlocked(currId, friendId);
+    if (blocked[friendId]) return false; // Just kill the request. Don't tell the sender that they are blocked
     if (blocked[currId]) throw "Error: You blocked that user. Unblock them and try again.";
 
     const now = new Date();
@@ -177,7 +178,7 @@ export const createFriendRequest = async (currId, friendId) => {
     const reverseRequest = await requestsCollection.findOne({from_id: friendId, to_id: currId});
     if (reverseRequest) {
         await processFriendRequest(currId, reverseRequest._id, true);
-        return true;
+        return false;
     }
 
     // Send the request or update the timestamp on an existing one
@@ -188,7 +189,7 @@ export const createFriendRequest = async (currId, friendId) => {
         { upsert: true });
 
     if (!result.acknowledged) throw "Error: failed to send/update request";
-    return true;
+    return result.matchedCount === 0;
 };
 
 export const processFriendRequest = async (currId, friendId, accept) => {

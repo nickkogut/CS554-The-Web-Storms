@@ -10,6 +10,7 @@ import { connectRedis } from './config/redisClient.js';
 import { questions as questionCollection } from './config/mongoCollections.js';
 import admin from './src/firebase/FirebaseAdmin.js';
 import { getUser } from './src/components/users/users.js';
+import { createFriendRequest } from './src/components/users/friendRequests.js';
 
 const GRAPHQL_PORT = Number(process.env.PORT) || 4000;
 const SOCKET_PORT = Number(process.env.SOCKET_PORT) || 4001;
@@ -567,6 +568,21 @@ io.on('connection', (socket) => {
 
   socket.on('initStatuses', ({uid, friend_ids}) => {
     initStatuses(uid, friend_ids);
+  });
+
+  socket.on('sendFriendRequest', async ({uid, friendId}) => {
+    try {
+      const req = await createFriendRequest(uid, friendId);
+      if (req) {
+        io.to(friendId).emit('friendRequest', {id: uid}); // Notify the recipient. Does nothing if they are offline
+      }
+    } catch (e) {
+      return;
+    }
+  });
+
+  socket.on('inviteToLobby', async ({uid, friendId}) => {
+    io.to(friendId).emit('lobbyInvite', {id: uid}); // Tells the friend they have been invited. They already know the lobby code
   });
 
   socket.on('disconnect', () => {

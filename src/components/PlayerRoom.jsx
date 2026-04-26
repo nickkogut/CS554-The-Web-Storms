@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { gameSocket } from "../gameSocket";
 import { TableBody, TableCell, TableContainer, TableHead, TableRow, Typography, Box, Alert, Button, Table, Paper } from "@mui/material";
+import { auth } from "../firebase/FirebaseConfig";
 
 function PlayerRoom(){
   const { roomId } = useParams();
@@ -30,6 +31,7 @@ function PlayerRoom(){
 
     function onRoomSnapshot(snapshot){
       setRoom(snapshot);
+      if (auth.currentUser()) gameSocket.emit("changeStatus", { uid: auth.currentUser.uid, status: response.room });
     }
 
     function onQuestionStarted(payload){
@@ -39,6 +41,7 @@ function PlayerRoom(){
       setSelectedOption(null);
       setSubmitted(false);
       setError("");
+      if (auth.currentUser()) gameSocket.emit("changeStatus", { uid: auth.currentUser.uid, status: "busy" });
     }
 
     function onQuestionClosed(payload){
@@ -52,6 +55,7 @@ function PlayerRoom(){
       window.dispatchEvent(
         new CustomEvent('questionOver', { detail: payload.leaderboard })
       );
+      if (auth.currentUser()) gameSocket.emit("changeStatus", { uid: auth.currentUser.uid, status: "online" });
     }
 
     gameSocket.on('room_snapshot', onRoomSnapshot);

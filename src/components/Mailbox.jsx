@@ -1,9 +1,11 @@
 import React, { useEffect, useState, useContext } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { AuthContext } from "../context/AuthContext";
 import { userAPI } from "./users/userAPI.js";
 import { gameSocket } from "../../socket.js";
 import ModifyFriendButton from "./users/ModifyFriendButton.jsx";
+import MailboxNotification from "./MailboxNotification.jsx";
+import FriendRequestNotification from "./FriendRequestNotification.jsx";
 
 import List from "@mui/material/List";
 import ListItem from "@mui/material/ListItem";
@@ -22,7 +24,7 @@ import PersonRemoveIcon from '@mui/icons-material/PersonRemove';
 import SendIcon from '@mui/icons-material/Send';
 import SportsEsportsIcon from '@mui/icons-material/SportsEsports';
 import DoNotDisturbOnIcon from '@mui/icons-material/DoNotDisturbOn';
-import js from "@eslint/js";
+
 
 
 export const Mailbox = () => {
@@ -33,90 +35,9 @@ export const Mailbox = () => {
   const [error, setError] = useState("");
   const [visible, setVisible] = useState(false);
   const [numNotifications, setNumNotifactions] = useState(0);
-
-  useEffect(() => {
-    if (!currentUser) {
-      setLoading(false); // If not authenticated, stop loading. They shouldn't be allowed to see the mailbox
-      setError("User not authenticated");
-      return;
-    }
-
-    const load = async () => {
-      try {
-        const requests_res = await userAPI.friend.getRequests();
-        const requests = requests_res.data?.getFriendRequestsForUser || [];
-        setFriendRequests(requests);
-        setNumNotifactions(friendRequests.length);
-
-        const friends_res = await userAPI.friend.get();
-        const friends = friends_res.data?.getFriendsForUser || [];
-        const friend_ids = friends.map((friend) => friend._id);
-        setFriends(friends);
-        gameSocket.emit("initStatuses", {uid: currentUser.uid, friend_ids});
-
-      } catch (err) {
-        setError("Failed to load friends");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-
-    load();
-
-    gameSocket.on("initStatuses", (statuses) => {
-      console.log("RECEIVED STATUSES ", JSON.stringify(statuses));
-
-      setFriends((prevFriends) => {
-        return prevFriends.map((friend) => {
-          if (statuses[friend._id]) {
-            return { ...friend, status: statuses[friend._id] };
-          }
-          return friend;
-        });
-      });
-    });
-
-    gameSocket.on("friendsUpdate", ({uid, status}) => {
-      console.log("received update: ", JSON.stringify(({uid, status})))
-      console.log("friends before ", JSON.stringify(friends))
-      setFriends((prevFriends) => {
-        return prevFriends.map((friend) => {
-          if (friend._id === uid) {
-            console.log("updating ", JSON.stringify({ ...friend, status, receivedInvite: false }))
-            return { ...friend, status, receivedInvite: false };
-          }
-          return friend;
-        });
-      });
-      // console.log("friends after ", JSON.stringify(friends))
-
-    });
-
-    gameSocket.on("lobbyInvite", ({from_id}) => {
-        setFriends((prevFriends) => {
-        const updatedFriends = prevFriends.map((friend) => {
-          if (friend._id === uid) {
-            return { ...friend, receivedInvite: true };
-          }
-          return friend;
-        });
-        return [...prevFriends];
-      });
-
-    });
-
-  }, [currentUser]);
-
-  const handleUnfriend = async (friendId) => {
-    try {
-      await userAPI.friend.remove(friendId);
-      setFriends((prev) => prev.filter((friend) => friend._id !== friendId));
-    } catch (err) {
-      setError("Failed to remove friend");
-    }
-  }
-
+  const [notification, setNotification] = useState(null);
+  const navigate = useNavigate();
+  
   const handleAccept = async (fromId) => {
     try {
       const processData = await userAPI.friend.processRequest(fromId, true);
@@ -149,9 +70,129 @@ export const Mailbox = () => {
     }
   };
 
+  useEffect(() => {
+    if (!currentUser) {
+      setLoading(false); // If not authenticated, stop loading. They shouldn't be allowed to see the mailbox
+      setError("User not authenticated");
+      return;
+    }
+
+    const load = async () => {
+      try {
+        const requests_res = await userAPI.friend.getRequests();
+        const requests = requests_res.data?.getFriendRequestsForUser || [];
+        setFriendRequests(requests);
+        setNumNotifactions(requests.length);
+
+        const friends_res = await userAPI.friend.get();
+        const friends = friends_res.data?.getFriendsForUser || [];
+        const friend_ids = friends.map((friend) => friend._id);
+        setFriends(friends);
+        gameSocket.emit("initStatuses", {uid: currentUser.uid, friend_ids});
+
+      } catch (err) {
+        setError("Failed to load friends");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    load();
+
+    gameSocket.on("initStatuses", (statuses) => {
+      setFriends((prevFriends) => {
+        return prevFriends.map((friend) => {
+          if (statuses[friend._id]) {
+            return { ...friend, status: statuses[friend._id] };
+          }
+          return friend;
+        });
+      });
+    });
+
+    gameSocket.on("friendsUpdate", ({uid, status}) => {
+      console.log("received update: ", JSON.stringify(({uid, status})))
+      setFriends((prevFriends) => {
+        return prevFriends.map((friend) => {
+          if (friend._id === uid) {
+            return { ...friend, status, receivedInvite: false };
+          }
+          return friend;
+        });
+      });
+    });
+
+    gameSocket.on("lobbyInvite", ({id}) => {
+      let code;
+        setFriends((prevFriends) => {
+        return prevFriends.map((friend) => {
+          if (friend._id === id) {
+            code = friend?.status?.code;
+            return { ...friend, receivedInvite: true };
+          }
+          return friend;
+        });
+        return [...prevFriends];
+      });
+
+      // Display a notification
+      if (code) {
+        setNotification({
+          component: FriendRequestNotification,
+          fields: {name: req.from_name, roomId: code},
+          handlers: {handleJoin = (roomId) => navigate(`/join/${roomId}`) /*TODO: get correct url*/}
+        });
+        setTimeout(() => {
+          setNotification(null);
+        }, 10_000);
+
+      }
+    });
+
+    gameSocket.on("friendRequest", async ({id}) => {
+      const requests_res = await userAPI.friend.getRequests();
+      const requests = requests_res.data?.getFriendRequestsForUser || [];
+      if (friendRequests.length < requests.length) setNumNotifactions(numNotifications - friendRequests.length + requests.length);
+      setFriendRequests(requests);
+      
+      // display notification
+      const req = requests.find((r) => r.from_id === id);
+      if (req) {
+        setNotification({
+          component: FriendRequestNotification,
+          fields: {name: req.from_name, id: req.from_id},
+          handlers: {handleAccept, handleReject, handleBlock}
+        });
+        setTimeout(() => {
+          setNotification(null);
+        }, 10_000);
+      }
+    });
+
+  }, [currentUser]);
+
+  const toggleVisible = () => {
+    // When closing, remove all temporary notifications (i.e. from game invites)
+    setNumNotifactions(friendRequests.length);
+    setVisible(!visible);
+  }
+
+  const inviteToLobby = (friendId) => {
+    gameSocket.emit("inviteToLobby", {uid: currentUser.uid, friendId});
+  }
+
+  const handleUnfriend = async (friendId) => {
+    try {
+      await userAPI.friend.remove(friendId);
+      setFriends((prev) => prev.filter((friend) => friend._id !== friendId));
+    } catch (err) {
+      setError("Failed to remove friend");
+    }
+  }
+
   return (
     <div id="mailbox">
-      <IconButton onClick={() => setVisible(!visible)} sx={{ background: "white" }}>
+      <IconButton onClick={() => toggleVisible()} sx={{ background: "white" }}>
         <Badge
           badgeContent={numNotifications}
           color="error"
@@ -244,24 +285,25 @@ export const Mailbox = () => {
               disableGutters
               secondaryAction={
               /* 
-              TODO
               If they are in a lobby: display "join lobby" button (game controller - color indicates if they requested you)
               If they are in a game or offline: show indicator (do not disturb icon) - and no other indicators
               If you are in a lobby: display "invite to lobby" button (paper airplane send icon)
-              
               */
 
                   <>
-                    {(friend?.status?.status === "online" /*TODO": and you are in a lobby*/) &&
-                    <IconButton onClick={() => {/* TODO: Invite them to your game - green if you already sent an invite*/}}>
+                    {(friend?.status?.status === "online" || friend?.status?.status == "in-lobby" /*TODO": and you are in a lobby*/) &&
+                    <IconButton onClick={() => {inviteToLobby(friend._id)}}>
                       <SendIcon/>
                     </IconButton>
                     }
 
 
                     {(friend?.status?.status === "in-lobby") &&
-                    <IconButton component={Link} to={`/join/${friend.status.status.code}`} variant="contained" size="large">
-                    {/* onClick={() => TODO: Join their game - gold if they invited you}> */}
+                    <IconButton component={Link} to={`/join/${friend.status.code}`} variant="contained" size="large" 
+                    sx={{
+                      color: friend?.receivedInvite ? "gold" : "gray",
+                    }}>
+                      {/* TODO: get correct url */}
                       <SportsEsportsIcon/>
                     </IconButton>
                     }
@@ -273,8 +315,9 @@ export const Mailbox = () => {
                         alignItems: "center",
                         verticalAlign: "middle",
                         color: friend?.status?.status === "busy" ? "red" : "gray"
+                        // Red if in a game, gray if offline
                       }}>
-                      <DoNotDisturbOnIcon sx={{fontSize: 24, color: "gray" /* TODO: Red if in a game, gray if offline - don't show otherwise*/}} />
+                      <DoNotDisturbOnIcon sx={{fontSize: 24}} />
                     </Box>
                   }
                     
@@ -304,6 +347,11 @@ export const Mailbox = () => {
         
           </Collapse>
         )}
+        {notification && 
+        <MailboxNotification
+          cardElements={notification}
+          setNotification={setNotification}
+        />}
   </div>
   );
 };
