@@ -44,15 +44,12 @@ const initStatuses = (uid, friend_ids) => {
       statuses[friend] = userStatusMap[friend];
     }
   })
-  console.log("DEBUG - emitting statuses, ", statuses, uid) // DEBUG
   io.to(uid).emit('initStatuses', statuses);
 };
 
 
 const changeStatus = async (uid, newStatus) => {
-  console.log("changing status ", uid, newStatus)
-  console.log(JSON.stringify(userStatusMap));
-  if (disconnectingUsers[uid]) { // Hold disconnect requests for a few seconds to prevent a refresh triggering them
+  if (disconnectingUsers[uid]) { // Hold disconnect requests for a few seconds to prevent a refresh triggering them unintentionally
     clearTimeout(disconnectingUsers[uid]);
     delete disconnectingUsers[uid];
   }
@@ -431,7 +428,6 @@ io.on('connection', (socket) => {
   });
     
   socket.on('player_reconnect', (payload, callback) => {
-    console.log("DEBUG ==== RECONNECTED TO SOCKET")
     try{
       const roomId = ensureString(payload?.roomId, 'Room ID');
       const playerId = ensureString(payload?.playerId, 'Player ID');

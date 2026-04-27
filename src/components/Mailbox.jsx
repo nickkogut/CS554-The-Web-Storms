@@ -111,7 +111,6 @@ export const Mailbox = () => {
     });
 
     gameSocket.on("friendsUpdate", ({uid, status}) => {
-      console.log("received update: ", JSON.stringify(({uid, status})))
       setFriends((prevFriends) => {
         return prevFriends.map((friend) => {
           if (friend._id === uid) {
@@ -136,11 +135,12 @@ export const Mailbox = () => {
       });
 
       // Display a notification
+      const handleJoin = (roomId) => navigate(`/join/${roomId}`); /*TODO: get correct url*/
       if (code) {
         setNotification({
           component: FriendRequestNotification,
           fields: {name: req.from_name, roomId: code},
-          handlers: {handleJoin = (roomId) => navigate(`/join/${roomId}`) /*TODO: get correct url*/}
+          handlers: {handleJoin}
         });
         setTimeout(() => {
           setNotification(null);

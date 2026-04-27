@@ -1,6 +1,5 @@
 import {createUser, getUser} from "../src/components/users/users.js";
 import {addFriend, createFriendRequest} from "../src/components/users/friendRequests.js";
-import {createNewUserByEmail} from "../src/firebase/FirebaseFunctions.js";
 import admin from "../src/firebase/FirebaseAdmin.js";
 import {users, friend_requests, blocked_users} from '../config/mongoCollections.js';
 
