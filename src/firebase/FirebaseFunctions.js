@@ -43,6 +43,7 @@ async function loginGoogle() {
 async function loginEmail(email, password) {
   let auth = getAuth();
   await signInWithEmailAndPassword(auth, email, password);
+  await userAPI.user.create(); // In case seeding has occurred since the account was created. i.e. make an account with google, seed, log back in
 }
 
 async function resetPassword(email) {

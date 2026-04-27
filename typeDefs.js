@@ -100,7 +100,7 @@ type Mutation {
   blockUser(friendId: String!): Boolean
   unblockUser(friendId: String!): Boolean
   createFriendRequest(friendId: String!): Boolean
-  processFriendRequest(friendId: String!, accept: Boolean!): Boolean
+  processFriendRequest(friendId: String!, accept: Boolean!): Friend
 }
 
 `;
