@@ -23,8 +23,7 @@ export const createUser = async (uid, displayName) => {
 export const getUser = async (_id) => {
     const usersCollection = await users();
     const user = await usersCollection.findOne({_id})
-    if (user) return user;
-    else throw "Error: could not find user";
+    return user; // May be empty. The caller would rather check if this is empty than handle an error.
 
 }
 
