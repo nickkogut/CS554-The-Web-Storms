@@ -1,4 +1,5 @@
 import React, { useContext, useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useSnackbar } from 'notistack';
 
 import AppBar from '@mui/material/AppBar';
@@ -14,15 +15,21 @@ import CardContent from '@mui/material/CardContent';
 import Divider from '@mui/material/Divider';
 import TextField from '@mui/material/TextField';
 import Chip from '@mui/material/Chip';
+import MenuItem from '@mui/material/MenuItem';
+import Select from '@mui/material/Select';
+import FormControl from '@mui/material/FormControl';
+import InputLabel from '@mui/material/InputLabel';
 
 import MenuIcon from '@mui/icons-material/Menu';
 import SearchIcon from '@mui/icons-material/Search';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
-import RefreshIcon from '@mui/icons-material/Refresh';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import ShareIcon from '@mui/icons-material/Share';
 import MailOutlineIcon from '@mui/icons-material/MailOutline';
 import WhatsAppIcon from '@mui/icons-material/WhatsApp';
+import EditIcon from '@mui/icons-material/Edit';
+import ContentDuplicateIcon from '@mui/icons-material/ContentCopy';
+import RefreshIcon from '@mui/icons-material/Refresh';
 
 import { AuthContext } from '../context/AuthContext';
 
@@ -30,7 +37,7 @@ const GRAPHQL_URL = 'http://localhost:4000/';
 
 function formatDate(value) {
     if (!value) return '—';
-    const date = new Date(value); ``
+    const date = new Date(value);
     if (Number.isNaN(date.getTime())) return '—';
     return date.toLocaleString();
 }
@@ -43,16 +50,19 @@ function buildShareMessage(code, quizName) {
 export default function QuizCatalog() {
     const { currentUser } = useContext(AuthContext);
     const { enqueueSnackbar } = useSnackbar();
+    const navigate = useNavigate();
 
     const [quizzes, setQuizzes] = useState([]);
     const [search, setSearch] = useState('');
-    const [scope, setScope] = useState('mine'); // mine | all
+    const [scope, setScope] = useState('mine');
+    const [sortBy, setSortBy] = useState('name');
     const [loading, setLoading] = useState(true);
     const [sessionsByQuizId, setSessionsByQuizId] = useState({});
 
-    const myIdentity = useMemo(() => {
-        return currentUser?.displayName || currentUser?.email || '';
-    }, [currentUser]);
+    const myIdentity = useMemo(
+        () => currentUser?.displayName || currentUser?.email || '',
+        [currentUser]
+    );
 
     const loadCatalog = async () => {
         setLoading(true);
@@ -65,10 +75,12 @@ export default function QuizCatalog() {
             quizName
             createdBy
             createdAt
+            updatedAt
+            timesPlayed
             questions {
               questionText
               options
-              correctOption
+              correctOptions
             }
           }
         }
@@ -76,9 +88,7 @@ export default function QuizCatalog() {
 
             const response = await fetch(GRAPHQL_URL, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ query })
             });
 
@@ -104,6 +114,7 @@ export default function QuizCatalog() {
 
     const filteredQuizzes = useMemo(() => {
         const q = search.trim().toLowerCase();
+
         let list = quizzes;
 
         if (scope === 'mine' && myIdentity) {
@@ -114,19 +125,26 @@ export default function QuizCatalog() {
 
         if (q) {
             list = list.filter((quiz) => {
-                const quizName = (quiz.quizName || '').toLowerCase();
-                const createdBy = (quiz.createdBy || '').toLowerCase();
+                const name = (quiz.quizName || '').toLowerCase();
+                const creator = (quiz.createdBy || '').toLowerCase();
                 const sessionCode = (sessionsByQuizId[quiz._id]?.code || '').toLowerCase();
-                return (
-                    quizName.includes(q) ||
-                    createdBy.includes(q) ||
-                    sessionCode.includes(q)
-                );
+                return name.includes(q) || creator.includes(q) || sessionCode.includes(q);
             });
         }
 
-        return list;
-    }, [quizzes, search, scope, myIdentity, sessionsByQuizId]);
+        const sorted = [...list];
+        if (sortBy === 'name') {
+            sorted.sort((a, b) => (a.quizName || '').localeCompare(b.quizName || ''));
+        } else if (sortBy === 'creator') {
+            sorted.sort((a, b) => (a.createdBy || '').localeCompare(b.createdBy || ''));
+        } else if (sortBy === 'plays') {
+            sorted.sort((a, b) => (b.timesPlayed || 0) - (a.timesPlayed || 0));
+        } else if (sortBy === 'recent') {
+            sorted.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+        }
+
+        return sorted;
+    }, [quizzes, search, scope, myIdentity, sortBy, sessionsByQuizId]);
 
     const startSession = async (quiz) => {
         try {
@@ -147,9 +165,7 @@ export default function QuizCatalog() {
 
             const response = await fetch(GRAPHQL_URL, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     query: mutation,
                     variables: { quizId: quiz._id }
@@ -163,12 +179,7 @@ export default function QuizCatalog() {
             }
 
             const session = result.data.startQuizSession;
-
-            setSessionsByQuizId((prev) => ({
-                ...prev,
-                [quiz._id]: session
-            }));
-
+            setSessionsByQuizId((prev) => ({ ...prev, [quiz._id]: session }));
             enqueueSnackbar(`Session started for "${quiz.quizName}".`, { variant: 'success' });
             return session;
         } catch (error) {
@@ -236,6 +247,45 @@ export default function QuizCatalog() {
         window.open(`https://wa.me/?text=${text}`, '_blank', 'noopener,noreferrer');
     };
 
+    const handleEdit = (quiz) => {
+        navigate(`/create-quiz?quizId=${quiz._id}`);
+    };
+
+    const handleDuplicate = async (quiz) => {
+        try {
+            const mutation = `
+        mutation DuplicateQuiz($quizId: String!) {
+          duplicateQuiz(quizId: $quizId) {
+            _id
+            quizName
+          }
+        }
+      `;
+
+            const response = await fetch(GRAPHQL_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    query: mutation,
+                    variables: { quizId: quiz._id }
+                })
+            });
+
+            const result = await response.json();
+
+            if (!response.ok || result.errors?.length) {
+                throw new Error(result?.errors?.[0]?.message || 'Could not duplicate quiz.');
+            }
+
+            enqueueSnackbar(`Quiz duplicated as "${result.data.duplicateQuiz.quizName}".`, {
+                variant: 'success'
+            });
+            await loadCatalog();
+        } catch (error) {
+            enqueueSnackbar(error.message || 'Something went wrong.', { variant: 'error' });
+        }
+    };
+
     return (
         <Box sx={{ minHeight: '100vh', bgcolor: '#f7f8fc' }}>
             <AppBar position="sticky">
@@ -256,7 +306,7 @@ export default function QuizCatalog() {
                             Quiz Catalog
                         </Typography>
                         <Typography variant="body1" color="text.secondary">
-                            Browse quizzes you created, search by code, and start a session.
+                            Browse quizzes you created, sort them, duplicate them, or start a session.
                         </Typography>
                     </Box>
 
@@ -266,7 +316,7 @@ export default function QuizCatalog() {
                                 <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} alignItems="center">
                                     <TextField
                                         fullWidth
-                                        label="Search by Quiz Name, Quiz Code or Quiz Creator"
+                                        label="Search by name, creator, or session code"
                                         value={search}
                                         onChange={(e) => setSearch(e.target.value)}
                                         InputProps={{
@@ -300,6 +350,21 @@ export default function QuizCatalog() {
                                         onClick={() => setScope('all')}
                                     />
                                 </Stack>
+
+                                <FormControl fullWidth size="small">
+                                    <InputLabel id="sort-by-label">Sort by</InputLabel>
+                                    <Select
+                                        labelId="sort-by-label"
+                                        label="Sort by"
+                                        value={sortBy}
+                                        onChange={(e) => setSortBy(e.target.value)}
+                                    >
+                                        <MenuItem value="name">Name</MenuItem>
+                                        <MenuItem value="creator">Creator</MenuItem>
+                                        <MenuItem value="plays">Times Played</MenuItem>
+                                        <MenuItem value="recent">Newest</MenuItem>
+                                    </Select>
+                                </FormControl>
                             </Stack>
                         </CardContent>
                     </Card>
@@ -342,6 +407,9 @@ export default function QuizCatalog() {
                                                         <Typography variant="body2" color="text.secondary">
                                                             Created by {quiz.createdBy || 'Anonymous'} • {formatDate(quiz.createdAt)}
                                                         </Typography>
+                                                        <Typography variant="body2" color="text.secondary">
+                                                            Times played: {quiz.timesPlayed || 0}
+                                                        </Typography>
                                                     </Box>
 
                                                     <Chip
@@ -364,6 +432,20 @@ export default function QuizCatalog() {
                                                         onClick={() => handleNativeShare(quiz)}
                                                     >
                                                         Share
+                                                    </Button>
+                                                    <Button
+                                                        variant="outlined"
+                                                        startIcon={<EditIcon />}
+                                                        onClick={() => handleEdit(quiz)}
+                                                    >
+                                                        Edit
+                                                    </Button>
+                                                    <Button
+                                                        variant="outlined"
+                                                        startIcon={<ContentDuplicateIcon />}
+                                                        onClick={() => handleDuplicate(quiz)}
+                                                    >
+                                                        Copy Quiz
                                                     </Button>
                                                 </Stack>
 

@@ -2,7 +2,7 @@ export const typeDefs = `#graphql
   type Question {
     questionText: String
     options: [String!]
-    correctOption: Int
+    correctOptions: [Int!]!
   }
 
   type Quiz {
@@ -10,6 +10,9 @@ export const typeDefs = `#graphql
     quizName: String
     createdBy: String
     createdAt: String
+    updatedAt: String
+    copiedFromQuizId: String
+    timesPlayed: Int
     questions: [Question]
   }
 
@@ -67,7 +70,7 @@ type User {
 input QuestionInput {
   questionText: String!
   options: [String!]!
-  correctOption: Int!
+  correctOptions: [Int!]!
 }
 
 input QuizInput {
@@ -78,8 +81,8 @@ input QuizInput {
 
 type Query {
   getQuizCatalog: [Quiz]
+  getQuizById(quizId: String!): Quiz
   getQuizSessionByCode(code: String!): QuizSession
-
 
   getUser: User
   getFriendRequestsForUser: [FriendRequest]
@@ -88,6 +91,8 @@ type Query {
 
 type Mutation {
   createQuiz(quiz: QuizInput!): Quiz
+  updateQuiz(quizId: String!, quiz: QuizInput!): Quiz
+  duplicateQuiz(quizId: String!): Quiz
   startQuizSession(quizId: String!): QuizSession
 
   createUser: User
@@ -102,5 +107,4 @@ type Mutation {
   createFriendRequest(friendId: String!): Boolean
   processFriendRequest(friendId: String!, accept: Boolean!): Boolean
 }
-
 `;

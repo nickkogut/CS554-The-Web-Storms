@@ -1,5 +1,6 @@
-import React, { useContext, useState } from 'react';
+import React, { useContext, useEffect, useState } from 'react';
 import { useSnackbar } from 'notistack';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 
 import AppBar from '@mui/material/AppBar';
 import Box from '@mui/material/Box';
@@ -18,6 +19,7 @@ import FormLabel from '@mui/material/FormLabel';
 import RadioGroup from '@mui/material/RadioGroup';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import Radio from '@mui/material/Radio';
+import Checkbox from '@mui/material/Checkbox';
 
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -33,7 +35,7 @@ function createBlankQuestion() {
         id: crypto.randomUUID(),
         questionText: '',
         options: ['', '', '', ''],
-        correctOption: 0
+        correctOptions: [0]
     };
 }
 
@@ -41,23 +43,25 @@ function normalizeQuestions(questions) {
     return questions.map((q) => ({
         questionText: q.questionText.trim(),
         options: q.options.map((opt) => opt.trim()),
-        correctOption: q.correctOption
+        correctOptions: q.correctOptions
     }));
 }
 
 export default function ModeratorPage() {
     const { currentUser } = useContext(AuthContext);
     const { enqueueSnackbar } = useSnackbar();
+    const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
+    const quizId = searchParams.get('quizId');
 
     const [quizName, setQuizName] = useState('');
     const [questions, setQuestions] = useState([createBlankQuestion()]);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [loadingQuiz, setLoadingQuiz] = useState(false);
 
     const updateQuestionText = (questionId, value) => {
         setQuestions((prev) =>
-            prev.map((q) =>
-                q.id === questionId ? { ...q, questionText: value } : q
-            )
+            prev.map((q) => (q.id === questionId ? { ...q, questionText: value } : q))
         );
     };
 
@@ -67,20 +71,25 @@ export default function ModeratorPage() {
                 q.id === questionId
                     ? {
                         ...q,
-                        options: q.options.map((opt, idx) =>
-                            idx === optionIndex ? value : opt
-                        )
+                        options: q.options.map((opt, idx) => (idx === optionIndex ? value : opt))
                     }
                     : q
             )
         );
     };
 
-    const updateCorrectOption = (questionId, value) => {
+    const toggleCorrectOption = (questionId, optionIndex) => {
         setQuestions((prev) =>
-            prev.map((q) =>
-                q.id === questionId ? { ...q, correctOption: Number(value) } : q
-            )
+            prev.map((q) => {
+                if (q.id !== questionId) return q;
+                const has = q.correctOptions.includes(optionIndex);
+                return {
+                    ...q,
+                    correctOptions: has
+                        ? q.correctOptions.filter((x) => x !== optionIndex)
+                        : [...q.correctOptions, optionIndex].sort((a, b) => a - b)
+                };
+            })
         );
     };
 
@@ -106,24 +115,81 @@ export default function ModeratorPage() {
             throw new Error('Quiz name cannot be empty.');
         }
 
-        for (let i = 0; i < questions.length; i++) {
+        for (let i = 0; i < questions.length; i += 1) {
             const q = questions[i];
 
             if (!q.questionText.trim()) {
                 throw new Error(`Question ${i + 1} cannot be empty.`);
             }
 
-            for (let j = 0; j < q.options.length; j++) {
+            for (let j = 0; j < q.options.length; j += 1) {
                 if (!q.options[j].trim()) {
                     throw new Error(`Option ${j + 1} in Question ${i + 1} cannot be empty.`);
                 }
             }
 
-            if (q.correctOption < 0 || q.correctOption > 3) {
-                throw new Error(`Please select the correct option for Question ${i + 1}.`);
+            if (!Array.isArray(q.correctOptions) || q.correctOptions.length === 0) {
+                throw new Error(`Select at least one correct option for Question ${i + 1}.`);
             }
         }
     };
+
+    useEffect(() => {
+        if (!quizId) return;
+
+        const loadQuiz = async () => {
+            try {
+                setLoadingQuiz(true);
+
+                const query = `
+          query GetQuizById($quizId: String!) {
+            getQuizById(quizId: $quizId) {
+              _id
+              quizName
+              questions {
+                questionText
+                options
+                correctOptions
+              }
+            }
+          }
+        `;
+
+                const response = await fetch(GRAPHQL_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        query,
+                        variables: { quizId }
+                    })
+                });
+
+                const result = await response.json();
+                if (!response.ok || result.errors?.length) {
+                    throw new Error(result?.errors?.[0]?.message || 'Could not load quiz.');
+                }
+
+                const quiz = result.data?.getQuizById;
+                if (!quiz) throw new Error('Quiz not found.');
+
+                setQuizName(quiz.quizName || '');
+                setQuestions(
+                    (quiz.questions || []).map((q) => ({
+                        id: crypto.randomUUID(),
+                        questionText: q.questionText || '',
+                        options: q.options || ['', '', '', ''],
+                        correctOptions: Array.isArray(q.correctOptions) ? q.correctOptions : []
+                    }))
+                );
+            } catch (error) {
+                enqueueSnackbar(error.message || 'Could not load quiz.', { variant: 'error' });
+            } finally {
+                setLoadingQuiz(false);
+            }
+        };
+
+        loadQuiz();
+    }, [quizId, enqueueSnackbar]);
 
     const buttonOnSend = async () => {
         try {
@@ -131,28 +197,39 @@ export default function ModeratorPage() {
 
             const payload = normalizeQuestions(questions);
 
-            const mutation = `
-        mutation CreateQuiz($quiz: QuizInput!) {
-          createQuiz(quiz: $quiz) {
-            _id
-            quizName
-            createdBy
-            createdAt
-            questions {
-              questionText
+            const mutation = quizId
+                ? `
+          mutation UpdateQuiz($quizId: String!, $quiz: QuizInput!) {
+            updateQuiz(quizId: $quizId, quiz: $quiz) {
+              _id
+              quizName
             }
           }
-        }
-      `;
+        `
+                : `
+          mutation CreateQuiz($quiz: QuizInput!) {
+            createQuiz(quiz: $quiz) {
+              _id
+              quizName
+            }
+          }
+        `;
 
             setIsSubmitting(true);
 
-            const response = await fetch(GRAPHQL_URL, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
+            const body = quizId
+                ? {
+                    query: mutation,
+                    variables: {
+                        quizId,
+                        quiz: {
+                            quizName: quizName.trim(),
+                            createdBy: currentUser?.displayName || currentUser?.email || 'Anonymous',
+                            questions: payload
+                        }
+                    }
+                }
+                : {
                     query: mutation,
                     variables: {
                         quiz: {
@@ -161,24 +238,37 @@ export default function ModeratorPage() {
                             questions: payload
                         }
                     }
-                })
+                };
+
+            const response = await fetch(GRAPHQL_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
             });
 
             const result = await response.json();
+
             if (!response.ok) {
-                throw new Error(result?.errors?.[0]?.message || 'Failed to send questions.');
+                throw new Error(result?.errors?.[0]?.message || 'Failed to save quiz.');
             }
 
             if (result.errors?.length) {
                 throw new Error(result.errors[0].message);
             }
 
-            enqueueSnackbar(`Quiz "${result.data.createQuiz.quizName}" saved successfully.`, {
-                variant: 'success'
-            });
+            enqueueSnackbar(
+                quizId
+                    ? `Quiz "${result.data.updateQuiz.quizName}" updated successfully.`
+                    : `Quiz "${result.data.createQuiz.quizName}" saved successfully.`,
+                { variant: 'success' }
+            );
 
-            setQuestions([createBlankQuestion()]);
-            setQuizName('');
+            if (!quizId) {
+                setQuestions([createBlankQuestion()]);
+                setQuizName('');
+            } else {
+                navigate('/my-quizzes');
+            }
         } catch (error) {
             enqueueSnackbar(error.message || 'Something went wrong.', {
                 variant: 'error'
@@ -187,6 +277,10 @@ export default function ModeratorPage() {
             setIsSubmitting(false);
         }
     };
+
+    if (loadingQuiz) {
+        return <div style={{ padding: 24 }}>Loading quiz...</div>;
+    }
 
     return (
         <Box sx={{ minHeight: '100vh', bgcolor: '#f7f8fc' }}>
@@ -205,13 +299,12 @@ export default function ModeratorPage() {
                 <Stack spacing={3}>
                     <Box>
                         <Typography variant="h4" sx={{ fontWeight: 700, mb: 1 }}>
-                            Create Questions
+                            {quizId ? 'Edit Quiz' : 'Create Quiz'}
                         </Typography>
                         <Typography variant="body1" color="text.secondary">
-                            Add a quiz name, enter four options, choose the correct answer, and send them to the backend.
+                            Add a quiz name, enter four options, choose one or more correct answers, and send them to the backend.
                         </Typography>
                     </Box>
-
 
                     <Card variant="outlined" sx={{ borderRadius: 3 }}>
                         <CardContent>
@@ -271,30 +364,28 @@ export default function ModeratorPage() {
                                                 key={optionIndex}
                                                 label={`Option ${optionIndex + 1}`}
                                                 value={option}
-                                                onChange={(e) =>
-                                                    updateOptionText(question.id, optionIndex, e.target.value)
-                                                }
+                                                onChange={(e) => updateOptionText(question.id, optionIndex, e.target.value)}
                                                 fullWidth
                                             />
                                         ))}
                                     </Box>
 
                                     <FormControl>
-                                        <FormLabel>Correct option</FormLabel>
-                                        <RadioGroup
-                                            row
-                                            value={String(question.correctOption)}
-                                            onChange={(e) => updateCorrectOption(question.id, e.target.value)}
-                                        >
+                                        <FormLabel>Correct options</FormLabel>
+                                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 1 }}>
                                             {question.options.map((_, optionIndex) => (
                                                 <FormControlLabel
                                                     key={optionIndex}
-                                                    value={String(optionIndex)}
-                                                    control={<Radio />}
+                                                    control={
+                                                        <Checkbox
+                                                            checked={question.correctOptions.includes(optionIndex)}
+                                                            onChange={() => toggleCorrectOption(question.id, optionIndex)}
+                                                        />
+                                                    }
                                                     label={`Option ${optionIndex + 1}`}
                                                 />
                                             ))}
-                                        </RadioGroup>
+                                        </Box>
                                     </FormControl>
                                 </Stack>
                             </CardContent>
@@ -320,11 +411,11 @@ export default function ModeratorPage() {
                             onClick={buttonOnSend}
                             disabled={isSubmitting}
                         >
-                            {isSubmitting ? 'Sending...' : 'Send'}
+                            {isSubmitting ? 'Saving...' : 'Save'}
                         </Button>
                     </Stack>
                 </Stack>
             </Container>
-        </Box >
+        </Box>
     );
 }
