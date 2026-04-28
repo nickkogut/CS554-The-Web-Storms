@@ -13,8 +13,11 @@ function formatTime(seconds) {
 
 export default function WaitingRoom({
   mode = "waiting", // 'waiting' | 'question'
+  role = 'user', 
+  isHost = undefined, // boolean to indicate host view
   joinedCount = 0,
   maxPlayers = null,
+  players = null, // host view: [{id,name,answered}]
   questionEndTime = null, // ISO string or ms timestamp
   questionDuration = null, // seconds (total duration of current question)
   timeLeft = null, // seconds
@@ -83,36 +86,65 @@ export default function WaitingRoom({
 
   const pct = mode === "question" && displayed.maxPlayers ? Math.round((displayed.joinedCount / displayed.maxPlayers) * 100) : 0;
 
+  const hostMode = typeof isHost === 'boolean' ? isHost : (role === 'host');
+
+  // Internal simple HostPanel rendered inline when user is host. Keeps host UI inside this component.
+  function HostPanel() {
+    return (
+      <Box sx={{ width: 320 }}>
+        <Typography variant="h6">Player Answers</Typography>
+        <Box sx={{ maxHeight: 360, overflow: 'auto', mt: 1 }}>
+          { (players || []).map(p => (
+            <Box key={p.id} sx={{ display: 'flex', alignItems: 'center', gap: 1, py: 1, borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
+              <Box sx={{ width: 36, height:36, borderRadius: '50%', bgcolor: p.answered ? 'success.main' : (mode === 'question' ? 'error.main' : 'grey.400'), display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white' }}>{p.name?.charAt(0) ?? '?'}</Box>
+              <Box>
+                <Typography variant="body1">{p.name || 'Anonymous'}</Typography>
+                <Typography variant="caption">{mode === 'question' ? (p.answered ? 'Answered' : 'Not answered') : ''}</Typography>
+              </Box>
+            </Box>
+          )) }
+        </Box>
+      </Box>
+    );
+  }
+
   return (
     <Box className="waiting-room-root">
-      <Box className="waiting-room-card">
-        <Stack spacing={2} alignItems="center">
+      <Box className="waiting-room-card" sx={{ display: hostMode ? 'flex' : 'block', gap: hostMode ? 2 : 0 }}>
+        {/** left/main column: user view content */}
+        <Box sx={{ flex: 1 }}>
+          <Stack spacing={2} alignItems="center">
+            {mode === "waiting" ? (
+              <>
+                <Typography variant="h5">Players Joined</Typography>
+                <Typography variant="h1" className="joined-count">{displayed.joinedCount}</Typography>
+                {displayed.maxPlayers ? (
+                  <Typography variant="subtitle1">{displayed.joinedCount} / {displayed.maxPlayers} max players</Typography>
+                ) : null}
+                <Typography variant="body1">Waiting for host to start the quiz...</Typography>
+              </>
+            ) : (
+              <>
+                <Typography variant="subtitle1">{displayed.unansweredCount} / {displayed.joinedCount ?? "?"} answering</Typography>
+                <Typography variant="subtitle2">Time left</Typography>
+                {remainingMs <= 0 ? (
+                  <Typography variant="h3" className="time-left">Time's up!</Typography>
+                ) : (
+                  <Typography variant="h3" className="time-left">{formatTime(Math.ceil(remainingMs / 1000))}</Typography>
+                )}
+                <Box sx={{ width: "100%", mt: 1 }}>
+                  <LinearProgress variant="determinate" value={timePctElapsed} />
+                </Box>
+              </>
+            )}
+          </Stack>
+        </Box>
 
-            {/**different waiting pages based before/during quiz */}
-          {mode === "waiting" ? (
-            <>
-              <Typography variant="h5">Players Joined</Typography>
-              <Typography variant="h1" className="joined-count">{displayed.joinedCount}</Typography>
-              {displayed.maxPlayers ? (
-                <Typography variant="subtitle1">{displayed.joinedCount} / {displayed.maxPlayers} max players</Typography>
-              ) : null}
-              <Typography variant="body1">Waiting for host to start the quiz...</Typography>
-            </>
-          ) : (
-            <>
-              <Typography variant="subtitle1">{displayed.unansweredCount} / {displayed.joinedCount ?? "?"} answering</Typography>
-              <Typography variant="subtitle2">Time left</Typography>
-              {remainingMs <= 0 ? (
-                <Typography variant="h3" className="time-left">Time's up!</Typography>
-              ) : (
-                <Typography variant="h3" className="time-left">{formatTime(Math.ceil(remainingMs / 1000))}</Typography>
-              )}
-              <Box sx={{ width: "100%", mt: 1 }}>
-                <LinearProgress variant="determinate" value={timePctElapsed} />
-              </Box>
-            </>
-          )}
-        </Stack>
+        {hostMode ? (
+          <Box sx={{ minWidth: 320 }}>
+            <HostPanel />
+          </Box>
+        ) : null}
       </Box>
     </Box>
   );
