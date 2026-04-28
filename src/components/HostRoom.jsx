@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { gameSocket } from "../gameSocket";
+import { gameSocket } from "../../socket.js";
 import { Typography, Box, Button, TableContainer, TableCell, TableHead, TableRow, TableBody, Alert, Paper, Table } from "@mui/material";
 
 function HostRoom() {

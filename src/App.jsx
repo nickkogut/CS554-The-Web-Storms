@@ -11,6 +11,8 @@ import Dashboard from './components/Dashboard.jsx';
 import JoinQuiz from './components/JoinQuiz.jsx';
 import ModeratorPage from './components/ModeratorPage';
 import HostQuiz from './components/HostQuiz.jsx';
+import HostRoom from './components/HostRoom.jsx';
+import PlayerRoom from './components/PlayerRoom.jsx';
 import Mailbox from './components/Mailbox.jsx';
 import WaitingRoomDemo from './components/WaitingRoomDemo';
 
@@ -29,6 +31,8 @@ function App() {
         <Route path='/' element={<Dashboard />} />
         <Route path='/join' element={<JoinQuiz />} />
         <Route path='/host' element={<HostQuiz />} />
+        <Route path='/host-room/:roomId' element={<HostRoom />} />
+        <Route path='/play-room/:roomId' element={<PlayerRoom />} />
 
         <Route path='/logout' element={<LogOut />} /> {/* Temporary - This will just be accessed as a button on other pages */}
 

@@ -1,4 +1,5 @@
 import React, { useContext, useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useSnackbar } from 'notistack';
 
 import AppBar from '@mui/material/AppBar';
@@ -23,8 +24,10 @@ import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import ShareIcon from '@mui/icons-material/Share';
 import MailOutlineIcon from '@mui/icons-material/MailOutline';
 import WhatsAppIcon from '@mui/icons-material/WhatsApp';
+import MeetingRoomIcon from '@mui/icons-material/MeetingRoom';
 
 import { AuthContext } from '../context/AuthContext';
+import { gameSocket } from '../../socket.js';
 
 const GRAPHQL_URL = 'http://localhost:4000/';
 
@@ -43,6 +46,7 @@ function buildShareMessage(code, quizName) {
 export default function QuizCatalog() {
     const { currentUser } = useContext(AuthContext);
     const { enqueueSnackbar } = useSnackbar();
+    const navigate = useNavigate();
 
     const [quizzes, setQuizzes] = useState([]);
     const [search, setSearch] = useState('');
@@ -164,17 +168,62 @@ export default function QuizCatalog() {
 
             const session = result.data.startQuizSession;
 
+            const liveRoom = await createLiveRoom(quiz, session.code);
+
+            const enrichedSession = liveRoom
+                ? { ...session, roomId: liveRoom.roomId, pin: liveRoom.pin }
+                : session;
+
             setSessionsByQuizId((prev) => ({
                 ...prev,
-                [quiz._id]: session
+                [quiz._id]: enrichedSession
             }));
 
             enqueueSnackbar(`Session started for "${quiz.quizName}".`, { variant: 'success' });
-            return session;
+            return enrichedSession;
         } catch (error) {
             enqueueSnackbar(error.message || 'Something went wrong.', { variant: 'error' });
             return null;
         }
+    };
+
+    const createLiveRoom = (quiz, code) => {
+        return new Promise((resolve) => {
+            if (!gameSocket.connected) {
+                gameSocket.connect();
+            }
+
+            const hostName = currentUser?.displayName || currentUser?.email || 'Host';
+
+            gameSocket.emit(
+                'create_room',
+                {
+                    hostName,
+                    quizId: quiz._id,
+                    code
+                },
+                (response) => {
+                    if (!response?.ok) {
+                        enqueueSnackbar(
+                            response?.error || 'Could not start the live room.',
+                            { variant: 'warning' }
+                        );
+                        resolve(null);
+                        return;
+                    }
+                    resolve(response);
+                }
+            );
+        });
+    };
+
+    const handleOpenHostRoom = (quiz) => {
+        const session = sessionsByQuizId[quiz._id];
+        if (!session?.roomId) {
+            enqueueSnackbar('Start the session first to open the host room.', { variant: 'info' });
+            return;
+        }
+        navigate(`/host-room/${session.roomId}`);
     };
 
     const ensureSession = async (quiz) => {
@@ -391,6 +440,14 @@ export default function QuizCatalog() {
                                                                 </Typography>
 
                                                                 <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} flexWrap="wrap">
+                                                                    <Button
+                                                                        variant="contained"
+                                                                        startIcon={<MeetingRoomIcon />}
+                                                                        onClick={() => handleOpenHostRoom(quiz)}
+                                                                        disabled={!session?.roomId}
+                                                                    >
+                                                                        Open Host Room
+                                                                    </Button>
                                                                     <Button
                                                                         variant="outlined"
                                                                         startIcon={<ContentCopyIcon />}
