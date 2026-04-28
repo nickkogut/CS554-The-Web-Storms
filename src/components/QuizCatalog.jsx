@@ -1,5 +1,8 @@
 import React, { useContext, useEffect, useMemo, useState } from 'react';
 import { useSnackbar } from 'notistack';
+import { useNavigate } from 'react-router-dom';
+
+import { gameSocket } from '../socket';
 
 import AppBar from '@mui/material/AppBar';
 import Box from '@mui/material/Box';
@@ -41,6 +44,7 @@ function buildShareMessage(code, quizName) {
 }
 
 export default function QuizCatalog() {
+    const navigate = useNavigate();
     const { currentUser } = useContext(AuthContext);
     const { enqueueSnackbar } = useSnackbar();
 
@@ -162,20 +166,32 @@ export default function QuizCatalog() {
                 throw new Error(result?.errors?.[0]?.message || 'Could not start session.');
             }
 
-            const session = result.data.startQuizSession;
-
-            setSessionsByQuizId((prev) => ({
-                ...prev,
-                [quiz._id]: session
-            }));
-
+            const gqlSession = result.data.startQuizSession;
+            const roomResponse = await new Promise((resolve, reject) => {
+                gameSocket.emit(
+                    'create_room',
+                    { hostName: currentUser?.displayName || 'Host', questionCount: quiz.questions.length },
+                    (res) => {
+                        if (!res?.ok) reject(new Error('Could not create game room.'));
+                        else resolve(res);
+                    }
+                );
+            });
+            const fullSession = { ...gqlSession, roomId: roomResponse.roomId, pin: roomResponse.pin };
+            setSessionsByQuizId((prev) => ({ ...prev, [quiz._id]: fullSession }));
             enqueueSnackbar(`Session started for "${quiz.quizName}".`, { variant: 'success' });
-            return session;
+            console.log('roomResponse:', roomResponse);
+console.log('fullSession:', fullSession);
+            return fullSession;
         } catch (error) {
             enqueueSnackbar(error.message || 'Something went wrong.', { variant: 'error' });
             return null;
         }
     };
+
+    const enterWaiting = async (sessionCode)=>{
+        navigate(`/host-room/${sessionCode}`);
+    }
 
     const ensureSession = async (quiz) => {
         const existing = sessionsByQuizId[quiz._id];
@@ -185,10 +201,10 @@ export default function QuizCatalog() {
 
     const handleCopyCode = async (quiz) => {
         const session = await ensureSession(quiz);
-        if (!session?.code) return;
+        if (!session?.pin) return;
 
         try {
-            await navigator.clipboard.writeText(session.code);
+            await navigator.clipboard.writeText(session.pin);
             enqueueSnackbar('Quiz code copied to clipboard.', { variant: 'success' });
         } catch {
             enqueueSnackbar('Could not copy the quiz code.', { variant: 'error' });
@@ -197,9 +213,9 @@ export default function QuizCatalog() {
 
     const handleNativeShare = async (quiz) => {
         const session = await ensureSession(quiz);
-        if (!session?.code) return;
+        if (!session?.pin) return;
 
-        const shareText = buildShareMessage(session.code, quiz.quizName);
+        const shareText = buildShareMessage(session.pin, quiz.quizName);
 
         try {
             if (navigator.share) {
@@ -221,18 +237,18 @@ export default function QuizCatalog() {
 
     const handleEmailShare = async (quiz) => {
         const session = await ensureSession(quiz);
-        if (!session?.code) return;
+        if (!session?.pin) return;
 
         const subject = encodeURIComponent(`Join my QuizQuest quiz: ${quiz.quizName}`);
-        const body = encodeURIComponent(buildShareMessage(session.code, quiz.quizName));
+        const body = encodeURIComponent(buildShareMessage(session.pin, quiz.quizName));
         window.open(`mailto:?subject=${subject}&body=${body}`, '_blank', 'noopener,noreferrer');
     };
 
     const handleWhatsAppShare = async (quiz) => {
         const session = await ensureSession(quiz);
-        if (!session?.code) return;
+        if (!session?.pin) return;
 
-        const text = encodeURIComponent(buildShareMessage(session.code, quiz.quizName));
+        const text = encodeURIComponent(buildShareMessage(session.pin, quiz.quizName));
         window.open(`https://wa.me/?text=${text}`, '_blank', 'noopener,noreferrer');
     };
 
@@ -324,6 +340,7 @@ export default function QuizCatalog() {
                         ) : (
                             filteredQuizzes.map((quiz) => {
                                 const session = sessionsByQuizId[quiz._id];
+                                const sessionCode = (sessionsByQuizId[quiz._id]?.code || '').toLowerCase();
 
                                 return (
                                     <Card key={quiz._id} variant="outlined" sx={{ borderRadius: 3 }}>
@@ -365,6 +382,15 @@ export default function QuizCatalog() {
                                                     >
                                                         Share
                                                     </Button>
+                                                    {session?.code &&
+                                                    (<Button
+                                                        variant="contained"
+                                                        startIcon={<PlayArrowIcon />}
+                                                        onClick={() => enterWaiting(session.roomId)}>   
+                                                        Go To Host Room                                                    
+                                                    </Button>)                                                 
+                                                    }
+
                                                 </Stack>
 
                                                 {session?.code ? (
@@ -383,7 +409,7 @@ export default function QuizCatalog() {
                                                                         wordBreak: 'break-all'
                                                                     }}
                                                                 >
-                                                                    {session.code}
+                                                                    {session.pin ?? session.code}
                                                                 </Typography>
 
                                                                 <Typography variant="body2" color="text.secondary">
