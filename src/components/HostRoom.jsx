@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { gameSocket } from "../socket.js";
 import { Typography, Box, Button, TableContainer, TableCell, TableHead, TableRow, TableBody, Alert, Paper, Table } from "@mui/material";
 import { auth } from "../firebase/FirebaseConfig";
+import WaitingRoom from "./WaitingRoom.jsx";
 
 function HostRoom() {
   const { roomId } = useParams();
@@ -193,32 +194,19 @@ function HostRoom() {
         <Box>
           <Typography variant="h2">Players</Typography>
 
-          <Box>
-            <TableContainer component={Paper}>
-              <Table>
-                <TableHead>
-                  <TableRow>
-                    <TableCell>#</TableCell>
-                    <TableCell>Name</TableCell>
-                    <TableCell>Score</TableCell>
-                    <TableCell>Connected</TableCell>
-                    <TableCell>Answered</TableCell>
-                  </TableRow>
-                </TableHead>
-              <TableBody>
-                {room.players.map((player, index) => (
-                  <TableRow key={player.playerId}>
-                    <TableCell>{index + 1}</TableCell>
-                    <TableCell>{player.name}</TableCell>
-                    <TableCell>{player.score}</TableCell>
-                    <TableCell>{player.connected ? "Yes" : "No"}</TableCell>
-                    <TableCell>{player.answeredCurrentQuestion ? "Yes" : "No"}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-              </Table>
-            </TableContainer>
-          </Box>
+          <WaitingRoom
+            mode={room.status === 'question' ? 'question' : 'waiting'}
+            isHost={true}
+            joinedCount={room.players.length}
+            questionEndTime={room.questionEndsAt}
+            questionDuration={15}
+            unansweredCount={room.players.filter(p => !p.answeredCurrentQuestion).length}
+            players={room.players.map(p => ({
+                id: p.playerId,
+                name: p.name,
+                answered: p.answeredCurrentQuestion
+            }))}
+          />
         </Box>
       ) : null}
 

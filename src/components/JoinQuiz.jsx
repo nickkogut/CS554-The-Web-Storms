@@ -1,14 +1,21 @@
 import { Box, Button, Stack, TextField } from "@mui/material";
 
 import { useNavigate } from "react-router-dom";
-import { useState } from "react";
+import { useState, useContext, useEffect } from "react";
 import { gameSocket } from "../socket";
+import { AuthContext } from "../context/AuthContext";
 
 function JoinQuiz(){
     const navigate = useNavigate();
-    const [name, setName] = useState("");
+    const {currentUser} = useContext(AuthContext);
+    const [name, setName] = useState(currentUser?.displayName || "");
     const [pin, setPin] = useState("");
-
+    useEffect(()=>{
+        if(currentUser.displayName){
+            setName(currentUser.displayName);
+        }
+    },[currentUser]);
+    console.log(currentUser);
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
     
