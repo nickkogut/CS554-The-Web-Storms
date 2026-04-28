@@ -6,6 +6,7 @@ import { gameSocket } from "../../socket.js";
 import ModifyFriendButton from "./users/ModifyFriendButton.jsx";
 import MailboxNotification from "./MailboxNotification.jsx";
 import FriendRequestNotification from "./FriendRequestNotification.jsx";
+import LobbyInviteNotification from "./LobbyInviteNotification.jsx";
 
 import List from "@mui/material/List";
 import ListItem from "@mui/material/ListItem";
@@ -34,8 +35,9 @@ export const Mailbox = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [visible, setVisible] = useState(false);
-  const [numNotifications, setNumNotifactions] = useState(0);
-  const [notification, setNotification] = useState(null);
+  const [numNotifications, setNumNotifications] = useState(0);
+  const [tempNotifications, setTempNotifications] = useState([]); // A list of friend ids with pending notifications that will be erased on mailbox collapse (e.g. game invites)
+  const [notification, setNotification] = useState(null); // Data for the currently displayed notification
   const navigate = useNavigate();
   
   const handleAccept = async (fromId) => {
@@ -43,7 +45,7 @@ export const Mailbox = () => {
       const processData = await userAPI.friend.processRequest(fromId, true);
       const newFriend = processData.data.processFriendRequest;
       setFriendRequests((prev) => prev.filter((r) => r.from_id !== fromId));
-      setNumNotifactions((prev) => prev - 1);
+      setNumNotifications((prev) => prev - 1);
       setFriends((prev) => [newFriend, ...prev]);
     } catch (err) {
       setError("Failed to accept request");
@@ -54,7 +56,7 @@ export const Mailbox = () => {
     try {
       await userAPI.friend.processRequest(fromId, false);
       setFriendRequests((prev) => prev.filter((r) => r.from_id !== fromId));
-      setNumNotifactions((prev) => prev - 1);
+      setNumNotifications((prev) => prev - 1);
     } catch (err) {
       setError("Failed to reject request");
     }
@@ -64,7 +66,7 @@ export const Mailbox = () => {
     try {
       await userAPI.block.block(friendId);
       setFriendRequests((prev) => prev.filter((r) => r.from_id !== friendId));
-      setNumNotifactions((prev) => prev - 1);
+      setNumNotifications((prev) => prev - 1);
     } catch (err) {
       setError("Failed to reject request");
     }
@@ -82,7 +84,8 @@ export const Mailbox = () => {
         const requests_res = await userAPI.friend.getRequests();
         const requests = requests_res.data?.getFriendRequestsForUser || [];
         setFriendRequests(requests);
-        setNumNotifactions(requests.length);
+        setNumNotifications(requests.length);
+        setTempNotifications([]);
 
         const friends_res = await userAPI.friend.get();
         const friends = friends_res.data?.getFriendsForUser || [];
@@ -97,64 +100,73 @@ export const Mailbox = () => {
       }
     };
 
-    load();
-
-    gameSocket.on("initStatuses", (statuses) => {
+    const handleInitStatuses = (statuses) => {
       setFriends((prevFriends) => {
-        return prevFriends.map((friend) => {
-          if (statuses[friend._id]) {
-            return { ...friend, status: statuses[friend._id] };
-          }
-          return friend;
+          return prevFriends.map((friend) => {
+            if (statuses[friend._id]) {
+              return { ...friend, status: statuses[friend._id] };
+            }
+            return friend;
+          });
         });
-      });
-    });
+      };
 
-    gameSocket.on("friendsUpdate", ({uid, status}) => {
-      setFriends((prevFriends) => {
-        return prevFriends.map((friend) => {
-          if (friend._id === uid) {
-            return { ...friend, status, receivedInvite: false };
-          }
-          return friend;
-        });
-      });
-    });
-
-    gameSocket.on("lobbyInvite", ({id}) => {
-      let code;
+      const handleFriendsUpdate = ({uid, status}) => {
         setFriends((prevFriends) => {
-        return prevFriends.map((friend) => {
-          if (friend._id === id) {
-            code = friend?.status?.code;
-            return { ...friend, receivedInvite: true };
+          return prevFriends.map((friend) => {
+            if (friend._id === uid) {
+              return { ...friend, status, receivedInvite: false };
+            }
+            return friend;
+          });
+        });
+      };
+      
+    const handleLobbyInvite = ({id}) => {
+      setFriends((prevFriends) => {
+        let friend;
+
+        const updated = prevFriends.map((f) => {
+          if (f._id === id) {
+            if (!f.receivedInvite) {
+              // Ignore if an invite was already received
+              friend = { ...f, receivedInvite: true };
+              return friend;
+            } 
           }
-          return friend;
+          return f;
         });
-        return [...prevFriends];
+        
+        if (friend) {
+          const code = friend?.status?.code;
+          const handleJoin = (roomId) => navigate(`/join/${roomId}`); /*TODO: get correct url*/
+          if (!tempNotifications.includes(friend._id)) {
+            let newTempNotifications = [...tempNotifications, friend._id]
+            setTempNotifications((prev) => [...prev, friend._id]);
+            setNumNotifications(newTempNotifications.length);
+          }
+
+          setNotification({
+              component: LobbyInviteNotification,
+              fields: {name: friend.name, roomId: code},
+              handlers: {handleJoin}
+          });
+          setTimeout(() => {
+            setNotification(null);
+          }, 10_000);
+        }
+        return updated;
       });
-
-      // Display a notification
-      const handleJoin = (roomId) => navigate(`/join/${roomId}`); /*TODO: get correct url*/
-      if (code) {
-        setNotification({
-          component: FriendRequestNotification,
-          fields: {name: req.from_name, roomId: code},
-          handlers: {handleJoin}
-        });
-        setTimeout(() => {
-          setNotification(null);
-        }, 10_000);
-
-      }
-    });
-
-    gameSocket.on("friendRequest", async ({id}) => {
+    };
+    
+    const handleFriendRequest = async ({id}) => {
       const requests_res = await userAPI.friend.getRequests();
       const requests = requests_res.data?.getFriendRequestsForUser || [];
-      if (friendRequests.length < requests.length) setNumNotifactions(numNotifications - friendRequests.length + requests.length);
+      if (friendRequests.length <= requests.length) return; // This request was already handled
+  
+      setNumNotifications((prev) => prev + 1);
       setFriendRequests(requests);
-      
+
       // display notification
       const req = requests.find((r) => r.from_id === id);
       if (req) {
@@ -167,13 +179,30 @@ export const Mailbox = () => {
           setNotification(null);
         }, 10_000);
       }
-    });
+    };
+      
+    load();
 
-  }, [currentUser]);
+    gameSocket.on("initStatuses", handleInitStatuses);
+    gameSocket.on("friendsUpdate", handleFriendsUpdate);
+    gameSocket.on("lobbyInvite", handleLobbyInvite);
+    gameSocket.on("friendRequest", handleFriendRequest);
+
+    return () => {
+    gameSocket.off("initStatuses", handleInitStatuses);
+    gameSocket.off("friendsUpdate", handleFriendsUpdate);
+    gameSocket.off("lobbyInvite", handleLobbyInvite);
+    gameSocket.off("friendRequest", handleFriendRequest);
+    };
+
+  }, []);
 
   const toggleVisible = () => {
-    // When closing, remove all temporary notifications (i.e. from game invites)
-    setNumNotifactions(friendRequests.length);
+    if (visible) {
+      // When closing, remove all temporary notifications (i.e. from game invites)
+      setNumNotifications(friendRequests.length);
+    }
+    
     setVisible(!visible);
   }
 

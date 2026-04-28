@@ -7,6 +7,7 @@ import CheckIcon from "@mui/icons-material/Check";
 import CloseIcon from "@mui/icons-material/Close";
 import BlockIcon from '@mui/icons-material/Block';
 import ModifyFriendButton from "./users/ModifyFriendButton";
+import Button from "@mui/material/Button";
 
 const LobbyInviteNotification = ({fields, handlers, setNotification}) => {
 
@@ -29,12 +30,12 @@ const LobbyInviteNotification = ({fields, handlers, setNotification}) => {
               {fields.name}
             </Typography>
             <Typography color="lightgray" marginLeft="10px">
-              has invited you to join their quiz: {roomId}
+              has invited you to join their quiz: {fields.roomId}
             </Typography>
           </CardContent>
 
           <CardActions>
-            <Button onClick={() => acceptAndClose()}>
+            <Button onClick={() => acceptAndClose()} sx={{ display: "flex", justifyContent: "center" }}>
               Join
             </Button>
           </CardActions>
