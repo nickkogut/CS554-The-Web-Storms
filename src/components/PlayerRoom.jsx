@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { gameSocket } from "../gameSocket";
+import { gameSocket } from "../socket.js";
 import { TableBody, TableCell, TableContainer, TableHead, TableRow, Typography, Box, Alert, Button, Table, Paper } from "@mui/material";
 import { auth } from "../firebase/FirebaseConfig";
 

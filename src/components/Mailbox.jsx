@@ -2,7 +2,7 @@ import React, { useEffect, useState, useContext } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { AuthContext } from "../context/AuthContext";
 import { userAPI } from "./users/userAPI.js";
-import { gameSocket } from "../../socket.js";
+import { gameSocket } from "../socket.js";
 import ModifyFriendButton from "./users/ModifyFriendButton.jsx";
 import MailboxNotification from "./MailboxNotification.jsx";
 import FriendRequestNotification from "./FriendRequestNotification.jsx";

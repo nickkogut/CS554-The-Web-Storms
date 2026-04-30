@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { Box, Stack, Button, TextField, ToggleButton, ToggleButtonGroup, Typography } from '@mui/material';
 import WaitingRoom from './WaitingRoom';
+import { List, ListItem, ListItemText, ListItemButton } from '@mui/material';
 
 export default function WaitingRoomDemo(){
   const [mode, setMode] = useState('waiting');
+  const [viewRole, setViewRole] = useState('user');
   const [joined, setJoined] = useState(5);
   const [maxPlayers, setMaxPlayers] = useState(10);
   const [timeSec, setTimeSec] = useState(20);
@@ -11,12 +13,35 @@ export default function WaitingRoomDemo(){
   const [questionDuration, setQuestionDuration] = useState(null);
   const [unanswered, setUnanswered] = useState(3);
 
+  const [players, setPlayers] = useState(() => 
+    Array.from({length:5}, (_,i)=> ({id: i+1, name: `Player ${i+1}`, answered: false}))
+  );
+
   const startQuestion = () => {
     const dur = Math.max(1, Number(timeSec) || 10);
     const ts = Date.now() + dur * 1000;
     setEndTs(ts);
     setQuestionDuration(dur);
     setMode('question');
+    // reset answered flags
+    setPlayers(p => p.map(x => ({...x, answered: false})));
+  };
+
+  // keep players array length in sync with joined
+  React.useEffect(() => {
+    setPlayers(prev => {
+      const cur = prev.slice();
+      if (joined > cur.length) {
+        for (let i = cur.length; i < joined; i++) cur.push({id: i+1, name: `Player ${i+1}`, answered: false});
+      } else if (joined < cur.length) {
+        cur.splice(joined);
+      }
+      return cur;
+    });
+  }, [joined]);
+
+  const toggleAnswered = (id) => {
+    setPlayers(p => p.map(x => x.id === id ? {...x, answered: !x.answered} : x));
   };
 
   return (
@@ -45,15 +70,48 @@ export default function WaitingRoomDemo(){
 
         <TextField label="Unanswered count" type="number" value={unanswered} onChange={e => setUnanswered(Number(e.target.value||0))} />
 
+        <Stack direction="row" spacing={2} alignItems="center">
+          <ToggleButtonGroup value={viewRole} exclusive onChange={(_, v) => v && setViewRole(v)}>
+            <ToggleButton value="user">User View</ToggleButton>
+            <ToggleButton value="host">Host View</ToggleButton>
+          </ToggleButtonGroup>
+        </Stack>
+
         <Box sx={{ mt: 2 }}>
-          <WaitingRoom
-            mode={mode}
-            joinedCount={joined}
-            maxPlayers={maxPlayers}
-            questionEndTime={endTs}
-            questionDuration={questionDuration}
-            unansweredCount={unanswered}
-          />
+          {viewRole === 'user' ? (
+            <WaitingRoom
+              mode={mode}
+              joinedCount={joined}
+              maxPlayers={maxPlayers}
+              questionEndTime={endTs}
+              questionDuration={questionDuration}
+              unansweredCount={players.filter(p=>!p.answered).length}
+              // not using subscribe here in demo
+            />
+          ) : (
+            <>
+              <WaitingRoom
+                mode={mode}
+                isHost={true}
+                players={players}
+                joinedCount={joined}
+                maxPlayers={maxPlayers}
+                questionEndTime={endTs}
+                questionDuration={questionDuration}
+                unansweredCount={players.filter(p=>!p.answered).length}
+              />
+              <Typography variant="subtitle2" sx={{ mt: 1 }}>Click a name to toggle answered</Typography>
+              <List>
+                {players.map(p => (
+                  <ListItem key={p.id} disablePadding>
+                    <ListItemButton onClick={() => toggleAnswered(p.id)}>
+                      <ListItemText primary={p.name} secondary={p.answered ? 'Answered' : 'Not answered'} />
+                    </ListItemButton>
+                  </ListItem>
+                ))}
+              </List>
+            </>
+          )}
         </Box>
       </Stack>
     </Box>
