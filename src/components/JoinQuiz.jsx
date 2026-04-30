@@ -10,14 +10,17 @@ function JoinQuiz(){
     const {currentUser} = useContext(AuthContext);
     const [name, setName] = useState(currentUser?.displayName || "");
     const [pin, setPin] = useState("");
-    useEffect(()=>{
-        if(currentUser.displayName){
-            setName(currentUser.displayName);
-        }
-    },[currentUser]);
-    console.log(currentUser);
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
+    useEffect(()=>{
+        if(currentUser?.displayName){
+            setName(currentUser.displayName);
+        }
+        else{
+            setName("");
+        }
+    },[currentUser, loading]);
+
     
     const handleEnter = (e)=>{
         e.preventDefault();
