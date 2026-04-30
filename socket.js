@@ -14,8 +14,8 @@ onAuthStateChanged(auth, (user) => {
     gameSocket.emit("joinPersonalRoom", { uid: auth.currentUser.uid });
   } else {
     // logged out or closed the page
-    gameSocket.emit("changeStatus", { uid: auth.currentUser.uid, status: "offline" });
-    gameSocket.emit("leavePersonalRoom", { uid: auth.currentUser.uid });
+    // gameSocket.emit("changeStatus", { uid: auth.currentUser.uid, status: "offline" });
+    // gameSocket.emit("leavePersonalRoom", { uid: auth.currentUser.uid });
   }
 });
 

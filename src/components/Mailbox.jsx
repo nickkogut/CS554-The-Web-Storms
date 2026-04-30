@@ -7,6 +7,7 @@ import ModifyFriendButton from "./users/ModifyFriendButton.jsx";
 import MailboxNotification from "./MailboxNotification.jsx";
 import FriendRequestNotification from "./FriendRequestNotification.jsx";
 import LobbyInviteNotification from "./LobbyInviteNotification.jsx";
+import NewFriendNotification from "./NewFriendNotification.jsx";
 
 import List from "@mui/material/List";
 import ListItem from "@mui/material/ListItem";
@@ -47,6 +48,10 @@ export const Mailbox = () => {
       setFriendRequests((prev) => prev.filter((r) => r.from_id !== fromId));
       setNumNotifications((prev) => prev - 1);
       setFriends((prev) => [newFriend, ...prev]);
+      setNotification(null); // Close the notification (regardless of what request was accepted)
+      
+      // Let your friend know that you accepted
+      gameSocket.emit("acceptFriendRequest", {"fromId": currentUser.uid, "toId": fromId});
     } catch (err) {
       setError("Failed to accept request");
     }
@@ -57,6 +62,7 @@ export const Mailbox = () => {
       await userAPI.friend.processRequest(fromId, false);
       setFriendRequests((prev) => prev.filter((r) => r.from_id !== fromId));
       setNumNotifications((prev) => prev - 1);
+      setNotification(null); // Close the notification (regardless of what request was rejected)
     } catch (err) {
       setError("Failed to reject request");
     }
@@ -67,6 +73,7 @@ export const Mailbox = () => {
       await userAPI.block.block(friendId);
       setFriendRequests((prev) => prev.filter((r) => r.from_id !== friendId));
       setNumNotifications((prev) => prev - 1);
+      setNotification(null); // Close the notification (regardless of what user was blocked)
     } catch (err) {
       setError("Failed to reject request");
     }
@@ -111,7 +118,8 @@ export const Mailbox = () => {
         });
       };
 
-      const handleFriendsUpdate = ({uid, status}) => {
+      const handleFriendStatusUpdate = ({uid, status}) => {
+        // A friend has changed status
         setFriends((prevFriends) => {
           return prevFriends.map((friend) => {
             if (friend._id === uid) {
@@ -121,6 +129,39 @@ export const Mailbox = () => {
           });
         });
       };
+
+    const handleFriendsListUpdate = async ({friendId, status, friended}) => {
+      if (!friended) {
+        // Unfriended
+        setFriends((prev) => prev.filter((friend) => friend._id !== friendId));
+        // Silently remove them from the friends list
+        return;
+      }
+
+      try {
+        // A friend accepted your request
+        const fullFriendsRes = await userAPI.friend.get(currentUser.uid)//.data?.getFriendsForUser || [];
+        const fullFriends = fullFriendsRes.data?.getFriendsForUser || [];
+        if (fullFriends.length == 0) return;
+        
+        const newFriend = {status, ...fullFriends.find((f) => f._id === friendId)};
+        if (!newFriend) return;
+
+        setFriends((prev) => [newFriend, ...prev]);
+
+        setNotification({
+              component: NewFriendNotification,
+              fields: {name: newFriend.name},
+              handlers: {}
+          });
+          setTimeout(() => {
+            setNotification(null);
+          }, 10_000);
+
+      } catch (err) {
+        return;
+      }
+    }
       
     const handleLobbyInvite = ({id}) => {
       setFriends((prevFriends) => {
@@ -160,9 +201,11 @@ export const Mailbox = () => {
     };
     
     const handleFriendRequest = async ({id}) => {
+      console.log("received req ")
       const requests_res = await userAPI.friend.getRequests();
       const requests = requests_res.data?.getFriendRequestsForUser || [];
-      if (friendRequests.length <= requests.length) return; // This request was already handled
+      console.log(friendRequests.length, requests.length)
+      if (friendRequests.length >= requests.length) return; // This request was already handled
   
       setNumNotifications((prev) => prev + 1);
       setFriendRequests(requests);
@@ -184,13 +227,15 @@ export const Mailbox = () => {
     load();
 
     gameSocket.on("initStatuses", handleInitStatuses);
-    gameSocket.on("friendsUpdate", handleFriendsUpdate);
+    gameSocket.on("friendsListUpdate", handleFriendsListUpdate);
+    gameSocket.on("friendsUpdate", handleFriendStatusUpdate);
     gameSocket.on("lobbyInvite", handleLobbyInvite);
     gameSocket.on("friendRequest", handleFriendRequest);
 
     return () => {
     gameSocket.off("initStatuses", handleInitStatuses);
-    gameSocket.off("friendsUpdate", handleFriendsUpdate);
+    gameSocket.off("friendsListUpdate", handleFriendsListUpdate);
+    gameSocket.off("friendsUpdate", handleFriendStatusUpdate);
     gameSocket.off("lobbyInvite", handleLobbyInvite);
     gameSocket.off("friendRequest", handleFriendRequest);
     };
@@ -214,6 +259,7 @@ export const Mailbox = () => {
     try {
       await userAPI.friend.remove(friendId);
       setFriends((prev) => prev.filter((friend) => friend._id !== friendId));
+      gameSocket.emit("unfriend", {"fromId": currentUser.uid, "toId": friendId}); // Silently update the friend's mailbox
     } catch (err) {
       setError("Failed to remove friend");
     }

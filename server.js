@@ -581,6 +581,18 @@ io.on('connection', (socket) => {
     io.to(friendId).emit('lobbyInvite', {id: uid}); // Tells the friend they have been invited. They already know the lobby code
   });
 
+  socket.on('acceptFriendRequest', async ({fromId, toId}) => {
+    let status = userStatusMap[fromId] || {status: "offline"};
+    // Relay to the receiver that the accepter confirmed their friend request. Note that DB updates are handled before emitting this
+    io.to(toId).emit('friendsListUpdate', {friendId: fromId, status, friended: true});
+  });
+
+  socket.on('unfriend', async ({fromId, toId}) => {
+    // Relay to the friend that they have been unfriended. This should be silent (no notification), but is reflected in the mailbox
+    // Note that DB updates are handled before emitting this
+    io.to(toId).emit('friendsListUpdate', {friendId: fromId, friended: false});
+  });
+
   socket.on('disconnect', () => {
     const meta = socketMeta.get(socket.id);
     clearSocketMeta(socket.id);

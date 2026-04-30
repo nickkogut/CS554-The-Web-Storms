@@ -13,6 +13,7 @@ import {
 } from 'firebase/auth';
 
 import {userAPI} from '../components/users/userAPI.js';
+import {gameSocket} from "../../socket.js";
 
 async function createNewUserByEmail(email, password, username) {
     const auth = getAuth();
@@ -54,6 +55,8 @@ async function resetPassword(email) {
 
 async function logOut() {
   let auth = getAuth();
+  gameSocket.emit("changeStatus", { uid: auth.currentUser.uid, status: "offline" });
+  gameSocket.emit("leavePersonalRoom", { uid: auth.currentUser.uid });
   await signOut(auth);
 }
 
