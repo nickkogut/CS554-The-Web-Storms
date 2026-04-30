@@ -331,10 +331,10 @@ io.on('connection', (socket) => {
       if(!questions.length){
         throw new Error('No questions found. Please create questions first.');
       }
-      const roomId = createRoomId();
+      // const roomId = createRoomId();
       const pin = createPin();
       const room = {
-        roomId,
+        roomId: pin,
         pin,
         hostSocketId: socket.id,
         hostName,

@@ -35,8 +35,6 @@ function App() {
         <Route path='/join' element={<JoinQuiz />} />
         <Route path='/host' element={<HostQuiz />} />
 
-        <Route path='/logout' element={<LogOut />} /> {/* Temporary - This will just be accessed as a button on other pages */}
-
         <Route path='/change-password' element={<PrivateRoute />} />
         <Route path='/change-password' element={<ChangePassword />} />
 

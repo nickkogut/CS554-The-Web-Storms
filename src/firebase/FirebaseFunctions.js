@@ -13,7 +13,7 @@ import {
 } from 'firebase/auth';
 
 import {userAPI} from '../components/users/userAPI.js';
-import {gameSocket} from "../../socket.js";
+import {gameSocket} from "../socket.js";
 
 async function createNewUserByEmail(email, password, username) {
     const auth = getAuth();
