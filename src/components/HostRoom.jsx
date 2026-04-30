@@ -30,7 +30,6 @@ function HostRoom() {
       setQuestion(payload);
       setQuestionClosed(null);
       setFinalResult(null);
-      if (auth.currentUser) gameSocket.emit("changeStatus", { uid: auth.currentUser.uid, status: "busy" });
     }
 
     function onQuestionClosed(payload){
@@ -43,7 +42,6 @@ function HostRoom() {
       window.dispatchEvent(
         new CustomEvent('questionOver', { detail: payload.leaderboard })
       );
-      if (auth.currentUser) gameSocket.emit("changeStatus", { uid: auth.currentUser.uid, status: "online" });
     }
 
     gameSocket.on('room_snapshot', onRoomSnapshot);
@@ -58,7 +56,6 @@ function HostRoom() {
       }
 
       setRoom(response.room);
-      if (auth.currentUser) gameSocket.emit("changeStatus", { uid: auth.currentUser.uid, status: response.room.pin });
     });
 
     return () => {

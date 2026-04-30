@@ -12,7 +12,7 @@ import Button from "@mui/material/Button";
 const LobbyInviteNotification = ({fields, handlers, setNotification}) => {
 
   const acceptAndClose = (handler) => {
-      handlers.handleJoin(fields.roomId);
+      handlers.joinFriend(fields.roomId, fields.friendId);
       setNotification(null);
   }
   return (

@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useContext } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { AuthContext } from "../context/AuthContext";
 import { userAPI } from "./users/userAPI.js";
 import { gameSocket } from "../socket.js";
@@ -39,6 +39,7 @@ export const Mailbox = () => {
   const [numNotifications, setNumNotifications] = useState(0);
   const [tempNotifications, setTempNotifications] = useState([]); // A list of friend ids with pending notifications that will be erased on mailbox collapse (e.g. game invites)
   const [notification, setNotification] = useState(null); // Data for the currently displayed notification
+  const [canInvite, setCanInvite] = useState(false);
   const navigate = useNavigate();
   
   const handleAccept = async (fromId) => {
@@ -78,6 +79,21 @@ export const Mailbox = () => {
       setError("Failed to reject request");
     }
   };
+
+  const joinFriend = (roomId, friendId) => {
+    gameSocket.emit('join_room', {pin: roomId, name: currentUser.displayName, playerId: currentUser.uid}, (response) => {
+      if(!response?.ok){
+        // setError(response?.error || "Could not join");
+        return;
+      }
+      navigate(`/play/${response.roomId}?playerId=${response.playerId}`);
+    });
+    try {
+      await userAPI.friend.updateLastInteracted(friendId);
+    } catch (e) {
+      // No action needed
+    }
+  }
 
   useEffect(() => {
     if (!currentUser) {
@@ -130,6 +146,11 @@ export const Mailbox = () => {
         });
       };
 
+    const handleUpdateLobbyStatus = async ({canInvite}) => {
+      // In a waiting room
+      setCanInvite(canInvite);
+    }
+
     const handleFriendsListUpdate = async ({friendId, status, friended}) => {
       if (!friended) {
         // Unfriended
@@ -179,8 +200,7 @@ export const Mailbox = () => {
         });
         
         if (friend) {
-          const code = friend?.status?.code;
-          const handleJoin = (roomId) => navigate(`/join/${roomId}`); /*TODO: get correct url*/
+          const roomId = friend?.status?.roomId;
           if (!tempNotifications.includes(friend._id)) {
             let newTempNotifications = [...tempNotifications, friend._id]
             setTempNotifications((prev) => [...prev, friend._id]);
@@ -189,8 +209,8 @@ export const Mailbox = () => {
 
           setNotification({
               component: LobbyInviteNotification,
-              fields: {name: friend.name, roomId: code},
-              handlers: {handleJoin}
+              fields: {name: friend.name, roomId, friendId: friend._id},
+              handlers: {joinFriend}
           });
           setTimeout(() => {
             setNotification(null);
@@ -229,6 +249,7 @@ export const Mailbox = () => {
     gameSocket.on("initStatuses", handleInitStatuses);
     gameSocket.on("friendsListUpdate", handleFriendsListUpdate);
     gameSocket.on("friendsUpdate", handleFriendStatusUpdate);
+    gameSocket.on("updateLobbyStatus", handleUpdateLobbyStatus);
     gameSocket.on("lobbyInvite", handleLobbyInvite);
     gameSocket.on("friendRequest", handleFriendRequest);
 
@@ -236,6 +257,7 @@ export const Mailbox = () => {
     gameSocket.off("initStatuses", handleInitStatuses);
     gameSocket.off("friendsListUpdate", handleFriendsListUpdate);
     gameSocket.off("friendsUpdate", handleFriendStatusUpdate);
+    gameSocket.off("updateLobbyStatus", handleUpdateLobbyStatus);
     gameSocket.off("lobbyInvite", handleLobbyInvite);
     gameSocket.off("friendRequest", handleFriendRequest);
     };
@@ -264,6 +286,7 @@ export const Mailbox = () => {
       setError("Failed to remove friend");
     }
   }
+
 
   return (
     <div id="mailbox">
@@ -359,26 +382,18 @@ export const Mailbox = () => {
               <ListItem key={`friend-${friend._id}`}
               disableGutters
               secondaryAction={
-              /* 
-              If they are in a lobby: display "join lobby" button (game controller - color indicates if they requested you)
-              If they are in a game or offline: show indicator (do not disturb icon) - and no other indicators
-              If you are in a lobby: display "invite to lobby" button (paper airplane send icon)
-              */
-
                   <>
-                    {(friend?.status?.status === "online" || friend?.status?.status == "in-lobby" /*TODO": and you are in a lobby*/) &&
+                    {((friend?.status?.status === "online" || friend?.status?.status == "in-lobby") && canInvite) &&
                     <IconButton onClick={() => {inviteToLobby(friend._id)}}>
                       <SendIcon/>
                     </IconButton>
                     }
 
-
                     {(friend?.status?.status === "in-lobby") &&
-                    <IconButton component={Link} to={`/join/${friend.status.code}`} variant="contained" size="large" 
+                    <IconButton onClick={() => joinFriend(friend.status.roomId)} variant="contained" size="large"
                     sx={{
                       color: friend?.receivedInvite ? "gold" : "gray",
                     }}>
-                      {/* TODO: get correct url */}
                       <SportsEsportsIcon/>
                     </IconButton>
                     }
@@ -390,7 +405,6 @@ export const Mailbox = () => {
                         alignItems: "center",
                         verticalAlign: "middle",
                         color: friend?.status?.status === "busy" ? "red" : "gray"
-                        // Red if in a game, gray if offline
                       }}>
                       <DoNotDisturbOnIcon sx={{fontSize: 24}} />
                     </Box>

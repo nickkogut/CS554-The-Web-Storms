@@ -31,7 +31,6 @@ function PlayerRoom(){
 
     function onRoomSnapshot(snapshot){
       setRoom(snapshot);
-      if (auth.currentUser()) gameSocket.emit("changeStatus", { uid: auth.currentUser.uid, status: response.room });
     }
 
     function onQuestionStarted(payload){
@@ -41,7 +40,6 @@ function PlayerRoom(){
       setSelectedOption(null);
       setSubmitted(false);
       setError("");
-      if (auth.currentUser()) gameSocket.emit("changeStatus", { uid: auth.currentUser.uid, status: "busy" });
     }
 
     function onQuestionClosed(payload){
@@ -55,7 +53,6 @@ function PlayerRoom(){
       window.dispatchEvent(
         new CustomEvent('questionOver', { detail: payload.leaderboard })
       );
-      if (auth.currentUser()) gameSocket.emit("changeStatus", { uid: auth.currentUser.uid, status: "online" });
     }
 
     gameSocket.on('room_snapshot', onRoomSnapshot);
