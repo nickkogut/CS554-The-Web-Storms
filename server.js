@@ -11,6 +11,7 @@ import { questions as questionCollection } from './config/mongoCollections.js';
 import admin from './src/firebase/FirebaseAdmin.js';
 import { getUser } from './src/components/users/users.js';
 import { createFriendRequest } from './src/components/users/friendRequests.js';
+import { connectRabbitMQ, publish, QUEUES } from './config/rabbitmq.js';
 
 const GRAPHQL_PORT = Number(process.env.PORT) || 4000;
 const SOCKET_PORT = Number(process.env.SOCKET_PORT) || 4001;
@@ -204,6 +205,16 @@ function finishQuiz(io, room){
     pin: room.pin,
     leaderboard: finalLeaderboard
   });
+
+  publish(QUEUES.QUIZ_RESULT, {
+    roomId: room.roomId,
+    pin: room.pin,
+    totalQuestions: room.questions.length,
+    numPlayers: finalLeaderboard.length,
+    leaderboard: finalLeaderboard,
+    finishedAt: new Date().toISOString()
+  })
+
   emitRoomSnapshot(io, room);
 }
 
@@ -225,9 +236,17 @@ function closeQuestion(io, roomId){
       answerStats[submitted.selectedOption] += 1;
       isCorrect = submitted.selectedOption === question.correctOption;
     }
+
+    let tempScore = 0;
+
     if(isCorrect){
-      player.score += 100;
+        const time_dif = room.questionEndsAt - submitted.submittedAt;
+        const time_score = time_dif / QUESTION_TIME_LIMIT_MS;
+        tempScore = Math.round(100 + (900*time_score));
     }
+
+    player.score += tempScore;
+
     playerResults.push({
       playerId: player.playerId,
       name: player.name,
@@ -284,6 +303,7 @@ function startQuestion(io, room){
 }
 
 await connectRedis();
+await connectRabbitMQ();
 
 const apolloServer = new ApolloServer({ typeDefs, resolvers });
 
