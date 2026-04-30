@@ -3,7 +3,7 @@ import { Box, Button, Stack } from "@mui/material";
 import { useContext, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AuthContext } from "../context/AuthContext";
-import { gameSocket } from "../../socket.js";
+import { gameSocket } from "../socket.js";
 
 function HostQuiz(){
   const {currentUser} = useContext(AuthContext);
@@ -43,9 +43,8 @@ function HostQuiz(){
               disabled={loading} >
                 {loading ? "Creating..." : "Start Live Quiz"}
             </Button>
-            <Button component={Link} to="/my-quizzes" variant="contained" size="large">My Quizzes</Button>
             <Button component={Link} to ="/create-quiz" variant="contained" size="large">Create Quiz</Button>
-            <Button component={Link} to="/search" variant="contained" size="large">Search Quizzes</Button>
+            <Button component={Link} to="/search-quizzes" variant="contained" size="large">Search Quizzes</Button>
             <Button component={Link} to="/waiting-demo" variant="outlined" size="large">Waiting Room Demo</Button>
         </Stack>
     </Box>

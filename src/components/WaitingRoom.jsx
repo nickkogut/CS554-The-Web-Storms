@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Box, Typography, LinearProgress, Stack } from "@mui/material";
 import { auth } from "../firebase/FirebaseConfig";
-import { gameSocket } from "../../socket";
+import { gameSocket } from "../socket";
 import "./waitingRoom.css";
 
 function formatTime(seconds) {

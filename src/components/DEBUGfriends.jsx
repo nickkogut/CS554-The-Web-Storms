@@ -1,6 +1,6 @@
 import React from "react";
 import userAPI from "./users/userAPI";
-import { gameSocket } from "../../socket";
+import { gameSocket } from "../socket";
 
 const DEBUGfriends = () => {
     const me = "POSnMgm7dpQS9oXzlSLtiJdi6tx2";
