@@ -170,7 +170,7 @@ export default function QuizCatalog() {
             const roomResponse = await new Promise((resolve, reject) => {
                 gameSocket.emit(
                     'create_room',
-                    { hostName: currentUser?.displayName || 'Host', questionCount: quiz.questions.length },
+                    { hostName: currentUser?.displayName || 'Host', questions: quiz.questions },
                     (res) => {
                         if (!res?.ok) reject(new Error('Could not create game room.'));
                         else resolve(res);

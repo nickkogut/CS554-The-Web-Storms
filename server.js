@@ -318,9 +318,15 @@ io.on('connection', (socket) => {
   socket.on('create_room', async (payload, callback) => {
     try{
       const hostName = ensureString(payload?.hostName || 'Host', 'Host name');
+      let questions;
+      if(Array.isArray(payload?.questions) && payload.questions.length > 0){
+        questions = payload.questions;
+      }
+      else{
       const requestedCount = Number(payload?.questionCount || DEFAULT_QUESTION_COUNT);
       const questionCount = Number.isInteger(requestedCount) && requestedCount > 0 ? requestedCount : DEFAULT_QUESTION_COUNT;
       const questions = await getRecentQuestions(questionCount);
+      }
       
       if(!questions.length){
         throw new Error('No questions found. Please create questions first.');
