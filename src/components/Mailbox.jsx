@@ -80,7 +80,7 @@ export const Mailbox = () => {
     }
   };
 
-  const joinFriend = (roomId, friendId) => {
+  const joinFriend = async (roomId, friendId) => {
     gameSocket.emit('join_room', {pin: roomId, name: currentUser.displayName, playerId: currentUser.uid}, (response) => {
       if(!response?.ok){
         // setError(response?.error || "Could not join");
