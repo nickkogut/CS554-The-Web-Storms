@@ -3,25 +3,25 @@ import { useContext } from "react";
 import { AuthContext } from "../context/AuthContext";
 import { AppBar, Toolbar, Button } from "@mui/material";
 
-function Navbar(){
-  const {currentUser} = useContext(AuthContext);
+function Navbar() {
+  const { currentUser } = useContext(AuthContext);
 
-  return(
+  return (
     <AppBar position="static">
-        <Toolbar>
-            <Button component={Link} to="/" color="secondary" variant="contained" size="small">Home</Button>
+      <Toolbar>
+        <Button component={Link} to="/" color="secondary" variant="contained" size="small">Home</Button>
 
-            {currentUser ? 
+        {currentUser ?
 
-            (
-            <Button component={Link} to='/signout' sx={{ ml:"auto" }} color="secondary" variant="contained" size="small">Sign Out</Button>
-            ) : 
+          (
+            <Button component={Link} to='/logout' sx={{ ml: "auto" }} color="secondary" variant="contained" size="small">Log Out</Button>
+          ) :
 
-            (
-            <Button component={Link} to='/login' sx={{ ml:"auto" }} color="secondary" variant="contained" size="small">Log In</Button>
-            )
-            }
-        </Toolbar>
+          (
+            <Button component={Link} to='/login' sx={{ ml: "auto" }} color="secondary" variant="contained" size="small">Log In</Button>
+          )
+        }
+      </Toolbar>
     </AppBar>
   )
 }

@@ -38,11 +38,6 @@ function ensureString(input, varName) {
   return value;
 }
 
-function ensureOptionalString(input, varName) {
-  if (input === undefined || input === null) return undefined;
-  return ensureString(input, varName);
-}
-
 function ensureIntArray(arr, varName) {
   if (!Array.isArray(arr) || arr.length === 0) {
     throw new GraphQLError(`${varName} must be a non-empty array`, {
@@ -85,22 +80,7 @@ function ensureQuestionInput(question, index) {
     ensureString(opt, `option ${optIndex + 1} for question ${index}`)
   );
 
-  let correctOptions = [];
-  if (Array.isArray(question.correctOptions)) {
-    correctOptions = ensureIntArray(question.correctOptions, `correctOptions for question ${index}`);
-  } else if (Number.isInteger(question.correctOption)) {
-    correctOptions = [question.correctOption];
-  } else {
-    throw new GraphQLError(`Question ${index} must have correctOptions`, {
-      extensions: { code: 'BAD_USER_INPUT' }
-    });
-  }
-
-  if (correctOptions.length === 0) {
-    throw new GraphQLError(`Question ${index} must have at least one correct option`, {
-      extensions: { code: 'BAD_USER_INPUT' }
-    });
-  }
+  const correctOptions = ensureIntArray(question.correctOptions, `correctOptions for question ${index}`);
 
   return {
     questionText,
@@ -116,29 +96,13 @@ function normalizeQuizDoc(doc) {
 
   copy.timesPlayed = Number.isInteger(copy.timesPlayed) ? copy.timesPlayed : 0;
 
-  copy.questions = (copy.questions || []).map((q) => {
-    if (Array.isArray(q.correctOptions)) {
-      return {
-        questionText: q.questionText,
-        options: q.options,
-        correctOptions: q.correctOptions
-      };
-    }
-
-    if (Number.isInteger(q.correctOption)) {
-      return {
-        questionText: q.questionText,
-        options: q.options,
-        correctOptions: [q.correctOption]
-      };
-    }
-
-    return {
-      questionText: q.questionText,
-      options: q.options,
-      correctOptions: []
-    };
-  });
+  copy.questions = (copy.questions || []).map((q) => ({
+    questionText: q.questionText,
+    options: q.options,
+    correctOptions: Array.isArray(q.correctOptions)
+      ? q.correctOptions
+      : (Number.isInteger(q.correctOption) ? [q.correctOption] : [])
+  }));
 
   return copy;
 }
@@ -198,6 +162,35 @@ async function getQuizByIdFromDb(quizId) {
   return quiz;
 }
 
+function requireUser(context) {
+  if (!context.user) {
+    throw new GraphQLError('Not authenticated', {
+      extensions: { code: 'UNAUTHENTICATED' }
+    });
+  }
+  return context.user;
+}
+
+function toMongoId(id) {
+  try {
+    return new ObjectId(id);
+  } catch {
+    throw new GraphQLError('quizId must be a valid quiz id', {
+      extensions: { code: 'BAD_USER_INPUT' }
+    });
+  }
+}
+
+function normalizeQuestionsForCopy(questions) {
+  return (questions || []).map((q) => ({
+    questionText: q.questionText,
+    options: Array.isArray(q.options) ? q.options : [],
+    correctOptions: Array.isArray(q.correctOptions)
+      ? q.correctOptions
+      : (Number.isInteger(q.correctOption) ? [q.correctOption] : [])
+  }));
+}
+
 export const resolvers = {
   Query: {
     getQuizCatalog: async () => {
@@ -206,7 +199,8 @@ export const resolvers = {
       return docs.map(normalizeQuizDoc);
     },
 
-    getQuizById: async (_, args) => {
+    getQuizById: async (_, args, context) => {
+      requireUser(context);
       const quiz = await getQuizByIdFromDb(args.quizId);
       return normalizeQuizDoc(quiz);
     },
@@ -225,26 +219,28 @@ export const resolvers = {
     },
 
     getFriendRequestsForUser: async (_, __, context) => {
-      if (!context.user) throw new GraphQLError('Not authenticated');
+      requireUser(context);
       const res = await getFriendRequestsForUser(context.user.uid);
       return res || [];
     },
 
     getFriendsForUser: async (_, __, context) => {
-      if (!context.user) throw new GraphQLError('Not authenticated');
+      requireUser(context);
       const user = await getUser(context.user.uid);
       return user?.friends || [];
     },
 
     getUser: async (_, __, context) => {
-      if (!context.user) throw new GraphQLError('Not authenticated');
+      requireUser(context);
       const user = await getUser(context.user.uid);
       return user;
     }
   },
 
   Mutation: {
-    createQuiz: async (_, args) => {
+    createQuiz: async (_, args, context) => {
+      const user = requireUser(context);
+
       if (!args.quiz || typeof args.quiz !== 'object') {
         throw new GraphQLError('quiz is required', {
           extensions: { code: 'BAD_USER_INPUT' }
@@ -258,16 +254,17 @@ export const resolvers = {
       }
 
       const quizName = ensureString(args.quiz.quizName, 'quizName');
-      const createdBy = ensureOptionalString(args.quiz.createdBy, 'createdBy') || 'Anonymous';
       const normalizedQuestions = args.quiz.questions.map((q, index) =>
         ensureQuestionInput(q, index + 1)
       );
 
+      const now = new Date().toISOString();
       const newDoc = {
         quizName,
-        createdBy,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+        createdByUid: user.uid,
+        createdByName: user.name || user.email || 'Anonymous',
+        createdAt: now,
+        updatedAt: now,
         timesPlayed: 0,
         copiedFromQuizId: null,
         questions: normalizedQuestions
@@ -286,7 +283,8 @@ export const resolvers = {
       return normalizeQuizDoc(created);
     },
 
-    updateQuiz: async (_, args) => {
+    updateQuiz: async (_, args, context) => {
+      const user = requireUser(context);
       const existing = await getQuizByIdFromDb(args.quizId);
 
       if (!args.quiz || typeof args.quiz !== 'object') {
@@ -302,7 +300,6 @@ export const resolvers = {
       }
 
       const quizName = ensureString(args.quiz.quizName, 'quizName');
-      const createdBy = ensureOptionalString(args.quiz.createdBy, 'createdBy') || existing.createdBy || 'Anonymous';
       const normalizedQuestions = args.quiz.questions.map((q, index) =>
         ensureQuestionInput(q, index + 1)
       );
@@ -313,7 +310,8 @@ export const resolvers = {
         {
           $set: {
             quizName,
-            createdBy,
+            createdByUid: existing.createdByUid || user.uid,
+            createdByName: existing.createdByName || user.name || user.email || 'Anonymous',
             questions: normalizedQuestions,
             updatedAt: new Date().toISOString()
           }
@@ -325,17 +323,19 @@ export const resolvers = {
     },
 
     duplicateQuiz: async (_, args, context) => {
+      const user = requireUser(context);
       const original = await getQuizByIdFromDb(args.quizId);
       const col = await quizCollection();
 
       const duplicated = {
         quizName: `${original.quizName} (copy)`,
-        createdBy: context.user?.name || context.user?.email || original.createdBy || 'Anonymous',
+        createdByUid: user.uid,
+        createdByName: user.name || user.email || 'Anonymous',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         timesPlayed: 0,
         copiedFromQuizId: original._id.toString(),
-        questions: (original.questions || []).map(ensureQuestionInputForCopy)
+        questions: normalizeQuestionsForCopy(original.questions)
       };
 
       const result = await col.insertOne(duplicated);
@@ -343,7 +343,16 @@ export const resolvers = {
       return normalizeQuizDoc(inserted);
     },
 
-    startQuizSession: async (_, args) => {
+    deleteQuiz: async (_, args, context) => {
+      requireUser(context);
+      const col = await quizCollection();
+      const id = toMongoId(args.quizId);
+      const deleted = await col.deleteOne({ _id: id });
+      return deleted.deletedCount > 0;
+    },
+
+    startQuizSession: async (_, args, context) => {
+      requireUser(context);
       const quiz = await getQuizByIdFromDb(args.quizId);
       const col = await quizCollection();
 
@@ -423,13 +432,3 @@ export const resolvers = {
     }
   }
 };
-
-function ensureQuestionInputForCopy(question) {
-  return {
-    questionText: question.questionText,
-    options: Array.isArray(question.options) ? question.options : [],
-    correctOptions: Array.isArray(question.correctOptions)
-      ? question.correctOptions
-      : (Number.isInteger(question.correctOption) ? [question.correctOption] : [])
-  };
-}

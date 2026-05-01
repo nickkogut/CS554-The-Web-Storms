@@ -1,12 +1,10 @@
-import React, { useContext, useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSnackbar } from 'notistack';
+import authorizedRequest from '../../authorizedRequest.js';
 
-import AppBar from '@mui/material/AppBar';
 import Box from '@mui/material/Box';
-import Toolbar from '@mui/material/Toolbar';
 import Typography from '@mui/material/Typography';
-import IconButton from '@mui/material/IconButton';
 import Button from '@mui/material/Button';
 import Stack from '@mui/material/Stack';
 import Container from '@mui/material/Container';
@@ -15,12 +13,11 @@ import CardContent from '@mui/material/CardContent';
 import Divider from '@mui/material/Divider';
 import TextField from '@mui/material/TextField';
 import Chip from '@mui/material/Chip';
-import MenuItem from '@mui/material/MenuItem';
-import Select from '@mui/material/Select';
 import FormControl from '@mui/material/FormControl';
 import InputLabel from '@mui/material/InputLabel';
+import Select from '@mui/material/Select';
+import MenuItem from '@mui/material/MenuItem';
 
-import MenuIcon from '@mui/icons-material/Menu';
 import SearchIcon from '@mui/icons-material/Search';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
@@ -28,12 +25,9 @@ import ShareIcon from '@mui/icons-material/Share';
 import MailOutlineIcon from '@mui/icons-material/MailOutline';
 import WhatsAppIcon from '@mui/icons-material/WhatsApp';
 import EditIcon from '@mui/icons-material/Edit';
-import ContentDuplicateIcon from '@mui/icons-material/ContentCopy';
+import ContentCopyAllIcon from '@mui/icons-material/ContentCopy';
+import DeleteIcon from '@mui/icons-material/Delete';
 import RefreshIcon from '@mui/icons-material/Refresh';
-
-import { AuthContext } from '../context/AuthContext';
-
-const GRAPHQL_URL = 'http://localhost:4000/';
 
 function formatDate(value) {
     if (!value) return '—';
@@ -48,55 +42,39 @@ function buildShareMessage(code, quizName) {
 }
 
 export default function QuizCatalog() {
-    const { currentUser } = useContext(AuthContext);
     const { enqueueSnackbar } = useSnackbar();
     const navigate = useNavigate();
 
     const [quizzes, setQuizzes] = useState([]);
     const [search, setSearch] = useState('');
-    const [scope, setScope] = useState('mine');
     const [sortBy, setSortBy] = useState('name');
     const [loading, setLoading] = useState(true);
     const [sessionsByQuizId, setSessionsByQuizId] = useState({});
 
-    const myIdentity = useMemo(
-        () => currentUser?.displayName || currentUser?.email || '',
-        [currentUser]
-    );
-
     const loadCatalog = async () => {
         setLoading(true);
-
         try {
-            const query = `
-        query GetQuizCatalog {
-          getQuizCatalog {
-            _id
-            quizName
-            createdBy
-            createdAt
-            updatedAt
-            timesPlayed
-            questions {
-              questionText
-              options
-              correctOptions
+            const result = await authorizedRequest({
+                type: 'query',
+                query: `
+          query GetQuizCatalog {
+            getQuizCatalog {
+              _id
+              quizName
+              createdByUid
+              createdByName
+              createdAt
+              updatedAt
+              timesPlayed
+              questions {
+                questionText
+                options
+                correctOptions
+              }
             }
           }
-        }
-      `;
-
-            const response = await fetch(GRAPHQL_URL, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ query })
+        `
             });
-
-            const result = await response.json();
-
-            if (!response.ok || result.errors?.length) {
-                throw new Error(result?.errors?.[0]?.message || 'Could not load quizzes.');
-            }
 
             setQuizzes(Array.isArray(result.data?.getQuizCatalog) ? result.data.getQuizCatalog : []);
         } catch (error) {
@@ -115,40 +93,32 @@ export default function QuizCatalog() {
     const filteredQuizzes = useMemo(() => {
         const q = search.trim().toLowerCase();
 
-        let list = quizzes;
-
-        if (scope === 'mine' && myIdentity) {
-            list = list.filter(
-                (quiz) => (quiz.createdBy || '').toLowerCase() === myIdentity.toLowerCase()
-            );
-        }
-
-        if (q) {
-            list = list.filter((quiz) => {
-                const name = (quiz.quizName || '').toLowerCase();
-                const creator = (quiz.createdBy || '').toLowerCase();
-                const sessionCode = (sessionsByQuizId[quiz._id]?.code || '').toLowerCase();
-                return name.includes(q) || creator.includes(q) || sessionCode.includes(q);
-            });
-        }
+        let list = quizzes.filter((quiz) => {
+            if (!q) return true;
+            const name = (quiz.quizName || '').toLowerCase();
+            const creatorName = (quiz.createdByName || '').toLowerCase();
+            const creatorUid = (quiz.createdByUid || '').toLowerCase();
+            return name.includes(q) || creatorName.includes(q) || creatorUid.includes(q);
+        });
 
         const sorted = [...list];
         if (sortBy === 'name') {
             sorted.sort((a, b) => (a.quizName || '').localeCompare(b.quizName || ''));
         } else if (sortBy === 'creator') {
-            sorted.sort((a, b) => (a.createdBy || '').localeCompare(b.createdBy || ''));
+            sorted.sort((a, b) =>
+                (a.createdByName || a.createdByUid || '').localeCompare(b.createdByName || b.createdByUid || '')
+            );
         } else if (sortBy === 'plays') {
             sorted.sort((a, b) => (b.timesPlayed || 0) - (a.timesPlayed || 0));
-        } else if (sortBy === 'recent') {
-            sorted.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
         }
 
         return sorted;
-    }, [quizzes, search, scope, myIdentity, sortBy, sessionsByQuizId]);
+    }, [quizzes, search, sortBy]);
 
     const startSession = async (quiz) => {
-        try {
-            const mutation = `
+        const result = await authorizedRequest({
+            type: 'mutation',
+            query: `
         mutation StartQuizSession($quizId: String!) {
           startQuizSession(quizId: $quizId) {
             code
@@ -156,36 +126,22 @@ export default function QuizCatalog() {
             quiz {
               _id
               quizName
-              createdBy
-              createdAt
             }
           }
         }
-      `;
+      `,
+            variables: { quizId: quiz._id }
+        });
 
-            const response = await fetch(GRAPHQL_URL, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    query: mutation,
-                    variables: { quizId: quiz._id }
-                })
-            });
+        const session = result.data?.startQuizSession;
+        if (!session) throw new Error('Could not start session.');
 
-            const result = await response.json();
+        setSessionsByQuizId((prev) => ({
+            ...prev,
+            [quiz._id]: session
+        }));
 
-            if (!response.ok || result.errors?.length) {
-                throw new Error(result?.errors?.[0]?.message || 'Could not start session.');
-            }
-
-            const session = result.data.startQuizSession;
-            setSessionsByQuizId((prev) => ({ ...prev, [quiz._id]: session }));
-            enqueueSnackbar(`Session started for "${quiz.quizName}".`, { variant: 'success' });
-            return session;
-        } catch (error) {
-            enqueueSnackbar(error.message || 'Something went wrong.', { variant: 'error' });
-            return null;
-        }
+        return session;
     };
 
     const ensureSession = async (quiz) => {
@@ -195,10 +151,8 @@ export default function QuizCatalog() {
     };
 
     const handleCopyCode = async (quiz) => {
-        const session = await ensureSession(quiz);
-        if (!session?.code) return;
-
         try {
+            const session = await ensureSession(quiz);
             await navigator.clipboard.writeText(session.code);
             enqueueSnackbar('Quiz code copied to clipboard.', { variant: 'success' });
         } catch {
@@ -207,12 +161,10 @@ export default function QuizCatalog() {
     };
 
     const handleNativeShare = async (quiz) => {
-        const session = await ensureSession(quiz);
-        if (!session?.code) return;
-
-        const shareText = buildShareMessage(session.code, quiz.quizName);
-
         try {
+            const session = await ensureSession(quiz);
+            const shareText = buildShareMessage(session.code, quiz.quizName);
+
             if (navigator.share) {
                 await navigator.share({
                     title: 'QuizQuest quiz',
@@ -232,8 +184,6 @@ export default function QuizCatalog() {
 
     const handleEmailShare = async (quiz) => {
         const session = await ensureSession(quiz);
-        if (!session?.code) return;
-
         const subject = encodeURIComponent(`Join my QuizQuest quiz: ${quiz.quizName}`);
         const body = encodeURIComponent(buildShareMessage(session.code, quiz.quizName));
         window.open(`mailto:?subject=${subject}&body=${body}`, '_blank', 'noopener,noreferrer');
@@ -241,8 +191,6 @@ export default function QuizCatalog() {
 
     const handleWhatsAppShare = async (quiz) => {
         const session = await ensureSession(quiz);
-        if (!session?.code) return;
-
         const text = encodeURIComponent(buildShareMessage(session.code, quiz.quizName));
         window.open(`https://wa.me/?text=${text}`, '_blank', 'noopener,noreferrer');
     };
@@ -253,28 +201,21 @@ export default function QuizCatalog() {
 
     const handleDuplicate = async (quiz) => {
         try {
-            const mutation = `
-        mutation DuplicateQuiz($quizId: String!) {
-          duplicateQuiz(quizId: $quizId) {
-            _id
-            quizName
+            const result = await authorizedRequest({
+                type: 'mutation',
+                query: `
+          mutation DuplicateQuiz($quizId: String!) {
+            duplicateQuiz(quizId: $quizId) {
+              _id
+              quizName
+            }
           }
-        }
-      `;
-
-            const response = await fetch(GRAPHQL_URL, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    query: mutation,
-                    variables: { quizId: quiz._id }
-                })
+        `,
+                variables: { quizId: quiz._id }
             });
 
-            const result = await response.json();
-
-            if (!response.ok || result.errors?.length) {
-                throw new Error(result?.errors?.[0]?.message || 'Could not duplicate quiz.');
+            if (result.errors?.length) {
+                throw new Error(result.errors[0].message);
             }
 
             enqueueSnackbar(`Quiz duplicated as "${result.data.duplicateQuiz.quizName}".`, {
@@ -286,19 +227,33 @@ export default function QuizCatalog() {
         }
     };
 
+    const handleDelete = async (quiz) => {
+        if (!window.confirm(`Delete "${quiz.quizName}"?`)) return;
+
+        try {
+            const result = await authorizedRequest({
+                type: 'mutation',
+                query: `
+          mutation DeleteQuiz($quizId: String!) {
+            deleteQuiz(quizId: $quizId)
+          }
+        `,
+                variables: { quizId: quiz._id }
+            });
+
+            if (result.errors?.length) {
+                throw new Error(result.errors[0].message);
+            }
+
+            enqueueSnackbar('Quiz deleted successfully.', { variant: 'success' });
+            await loadCatalog();
+        } catch (error) {
+            enqueueSnackbar(error.message || 'Could not delete quiz.', { variant: 'error' });
+        }
+    };
+
     return (
         <Box sx={{ minHeight: '100vh', bgcolor: '#f7f8fc' }}>
-            <AppBar position="sticky">
-                <Toolbar variant="dense">
-                    <IconButton edge="start" color="inherit" aria-label="menu" sx={{ mr: 2 }}>
-                        <MenuIcon />
-                    </IconButton>
-                    <Typography variant="h6" color="inherit" component="div">
-                        Quiz Quest Catalog
-                    </Typography>
-                </Toolbar>
-            </AppBar>
-
             <Container maxWidth="lg" sx={{ py: 4 }}>
                 <Stack spacing={3}>
                     <Box>
@@ -306,7 +261,7 @@ export default function QuizCatalog() {
                             Quiz Catalog
                         </Typography>
                         <Typography variant="body1" color="text.secondary">
-                            Browse quizzes you created, sort them, duplicate them, or start a session.
+                            Browse every saved quiz, sort it, duplicate it, delete it, or start a session.
                         </Typography>
                     </Box>
 
@@ -316,7 +271,7 @@ export default function QuizCatalog() {
                                 <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} alignItems="center">
                                     <TextField
                                         fullWidth
-                                        label="Search by name, creator, or session code"
+                                        label="Search by name or creator"
                                         value={search}
                                         onChange={(e) => setSearch(e.target.value)}
                                         InputProps={{
@@ -334,23 +289,6 @@ export default function QuizCatalog() {
                                     </Button>
                                 </Stack>
 
-                                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
-                                    <Chip
-                                        label="My quizzes"
-                                        clickable
-                                        variant={scope === 'mine' ? 'filled' : 'outlined'}
-                                        color={scope === 'mine' ? 'primary' : 'default'}
-                                        onClick={() => setScope('mine')}
-                                    />
-                                    <Chip
-                                        label="All quizzes"
-                                        clickable
-                                        variant={scope === 'all' ? 'filled' : 'outlined'}
-                                        color={scope === 'all' ? 'primary' : 'default'}
-                                        onClick={() => setScope('all')}
-                                    />
-                                </Stack>
-
                                 <FormControl fullWidth size="small">
                                     <InputLabel id="sort-by-label">Sort by</InputLabel>
                                     <Select
@@ -361,8 +299,7 @@ export default function QuizCatalog() {
                                     >
                                         <MenuItem value="name">Name</MenuItem>
                                         <MenuItem value="creator">Creator</MenuItem>
-                                        <MenuItem value="plays">Times Played</MenuItem>
-                                        <MenuItem value="recent">Newest</MenuItem>
+                                        <MenuItem value="plays">Times played</MenuItem>
                                     </Select>
                                 </FormControl>
                             </Stack>
@@ -405,7 +342,7 @@ export default function QuizCatalog() {
                                                             {quiz.quizName || 'Untitled Quiz'}
                                                         </Typography>
                                                         <Typography variant="body2" color="text.secondary">
-                                                            Created by {quiz.createdBy || 'Anonymous'} • {formatDate(quiz.createdAt)}
+                                                            Created by {quiz.createdByName || quiz.createdByUid || 'Anonymous'} • {formatDate(quiz.createdAt)}
                                                         </Typography>
                                                         <Typography variant="body2" color="text.secondary">
                                                             Times played: {quiz.timesPlayed || 0}
@@ -422,7 +359,10 @@ export default function QuizCatalog() {
                                                     <Button
                                                         variant="contained"
                                                         startIcon={<PlayArrowIcon />}
-                                                        onClick={() => startSession(quiz)}
+                                                        onClick={async () => {
+                                                            const s = await ensureSession(quiz);
+                                                            enqueueSnackbar(`Session started. Code: ${s.code}`, { variant: 'success' });
+                                                        }}
                                                     >
                                                         Start Session
                                                     </Button>
@@ -442,10 +382,18 @@ export default function QuizCatalog() {
                                                     </Button>
                                                     <Button
                                                         variant="outlined"
-                                                        startIcon={<ContentDuplicateIcon />}
+                                                        startIcon={<ContentCopyAllIcon />}
                                                         onClick={() => handleDuplicate(quiz)}
                                                     >
                                                         Copy Quiz
+                                                    </Button>
+                                                    <Button
+                                                        color="error"
+                                                        variant="outlined"
+                                                        startIcon={<DeleteIcon />}
+                                                        onClick={() => handleDelete(quiz)}
+                                                    >
+                                                        Delete Quiz
                                                     </Button>
                                                 </Stack>
 
@@ -459,11 +407,7 @@ export default function QuizCatalog() {
 
                                                                 <Typography
                                                                     variant="h4"
-                                                                    sx={{
-                                                                        fontWeight: 800,
-                                                                        letterSpacing: 2,
-                                                                        wordBreak: 'break-all'
-                                                                    }}
+                                                                    sx={{ fontWeight: 800, letterSpacing: 2, wordBreak: 'break-all' }}
                                                                 >
                                                                     {session.code}
                                                                 </Typography>
