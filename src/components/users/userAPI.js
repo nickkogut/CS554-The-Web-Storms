@@ -1,4 +1,5 @@
 import authorizedRequest from '../../../authorizedRequest.js';
+import publicRequest from '../../../publicRequest.js';
 
 export const userAPI = {
   user: {},
@@ -168,6 +169,45 @@ userAPI.quizHist.add = async (quizResult) => {
       }
     `,
     variables: { quizResult }
+  });
+};
+
+userAPI.getUserById = async (id) => {
+  return publicRequest({
+    query: `
+      query GetUserById($id: String!){
+        getUserById(id: $id){
+          _id
+          name
+          email
+        }
+      }
+    `,
+    variables: { id }
+  });
+};
+
+userAPI.getGamesByUserId = async (id) => {
+  return publicRequest({
+    query: `
+      query GetGamesByUserId($id: String!){
+        getGamesUserById(id: $id){
+          roomId
+          quizName
+          pin
+          numPlayers
+          finishedAt
+          leaderboard {
+            rank
+            playerId
+            uid
+            name
+            score
+          }
+        }
+      }
+    `,
+    variables: { id }
   });
 };
 

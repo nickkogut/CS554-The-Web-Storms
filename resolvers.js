@@ -3,7 +3,7 @@ import { ObjectId } from 'mongodb';
 
 import client from './config/redisClient.js';
 import { quizzes as quizCollection } from './config/mongoCollections.js';
-import { createUser, getUser, addQuizToHistory } from './src/components/users/users.js';
+import { createUser, getUser, addQuizToHistory, getGames } from './src/components/users/users.js';
 import { getFriendRequestsForUser, addFriend, removeFriend, updateLastInteracted, blockUser, unblockUser, 
   createFriendRequest, processFriendRequest } from './src/components/users/friendRequests.js';
 
@@ -166,6 +166,26 @@ export const resolvers = {
       
       const user = await getUser(context.user.uid); // Throws if no user found
       return user;
+    },
+
+    getUserById: async(_, {id})=>{
+      const user = await getUser(id);
+      if(!user){
+        throw new GraphQLError('User not found', {
+          extensions: { code: 'NOT_FOUND' }
+        });      
+      }
+      return user;
+    },
+
+    getGamesUserById: async(_, {id})=>{
+      const games = await getGames(id);
+      if(!games){
+        throw new GraphQLError('No games found', {
+          extensions: { code: 'NOT_FOUND' }
+        });      
+      }
+      return games;
     }
   },
 
@@ -244,7 +264,7 @@ export const resolvers = {
     // User Mutations
     createUser: async (_, __, context) => {
     if (!context.user) throw new GraphQLError("Not authenticated");
-    const user = createUser(context.user.uid, context.user.name);
+    const user = createUser(context.user.uid, context.user.name, context.user.email);
     return user;
   },
 

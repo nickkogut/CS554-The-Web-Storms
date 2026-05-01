@@ -19,3 +19,4 @@ export const users = getCollectionFn('users');
 export const friend_requests = getCollectionFn('friend_requests');
 export const blocked_users = getCollectionFn('blocked_users');
 export const quizzes = getCollectionFn('quizzes');
+export const games = getCollectionFn('completedQuizzes');
