@@ -16,6 +16,7 @@ import WaitingRoomDemo from './components/WaitingRoomDemo';
 import WaitingRoom from './components/WaitingRoom.jsx';
 import HostRoom from './components/HostRoom.jsx';
 import PlayerGame from './components/PlayerGame.jsx';
+import Player from './components/Player.jsx';
 
 import QuizCatalog from './components/QuizCatalog.jsx';
 import DEBUGfriends from './components/DEBUGfriends.jsx';
@@ -46,6 +47,8 @@ function App() {
         <Route path='/host-room/:roomId' element={<HostRoom/>}/>
 
         <Route path='/test-friends' element={<DEBUGfriends/>} />
+
+        <Route path='/player/:id' element={<Player/>}/>
 
       <Route path="*" element={<Navigate to="/" replace={true} />} />
 

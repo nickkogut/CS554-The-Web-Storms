@@ -29,7 +29,7 @@ function JoinQuiz(){
         setError("");
         setLoading(true);
 
-        gameSocket.emit('join_room', {pin, name}, (response)=>{
+        gameSocket.emit('join_room', {pin, name, uid: currentUser?.uid || null}, (response)=>{
             setLoading(false);
             if(!response?.ok){
                 setError(response?.error || "Could not join");

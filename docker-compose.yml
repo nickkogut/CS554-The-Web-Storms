@@ -20,7 +20,7 @@ services:
       redis:
         condition: service_started
       rabbitmq:
-        condition: service_started
+        condition: service_healthy
     command: node server.js
 
   mongo:
@@ -58,7 +58,7 @@ services:
       redis:
         condition: service_started
       rabbitmq:
-        condition: service_started
+        condition: service_healthy
     command: node src/workers/quizResultWorker.js
 
 volumes:

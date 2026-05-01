@@ -6,7 +6,9 @@ import LogOutButton from "./auth/LogOutButton.jsx";
 import { AppBar, Toolbar, Button, Box } from "@mui/material";
 
 function Navbar(){
+  let uid;
   const {currentUser} = useContext(AuthContext);
+  if(currentUser) {uid = currentUser.uid;}
 
   return(
     <AppBar position="static">
@@ -14,9 +16,10 @@ function Navbar(){
             <Button component={Link} to="/" color="secondary" variant="contained" size="small">Home</Button>
 
             {currentUser ? 
-
+            
             (
             <Box sx={{ml: "auto", display: "flex", alignItems: "center", gap: "20px"}}>
+            <Button component={Link} to={`/player/${uid}`} color="secondary" variant="contained" size="small">Profile</Button>
             <Mailbox/>
             <LogOutButton/>
             </Box>

@@ -136,6 +136,7 @@ function getPublicPlayers(room){
       rank: index+1,
       playerId: player.playerId,
       name: player.name,
+      uid: player.uid || null,
       score: player.score,
       connected: player.connected,
       answeredCurrentQuestion: room.status === 'question' ? room.answers.has(player.playerId) : false
@@ -208,6 +209,7 @@ function finishQuiz(io, room){
 
   publish(QUEUES.QUIZ_RESULT, {
     roomId: room.roomId,
+    quizName: room.quizName,
     pin: room.pin,
     totalQuestions: room.questions.length,
     numPlayers: finalLeaderboard.length,
@@ -356,6 +358,7 @@ io.on('connection', (socket) => {
       const room = {
         roomId,
         pin,
+        quizName: payload?.quizName || 'Untitled Quiz',
         hostSocketId: socket.id,
         hostName,
         status: 'lobby',
@@ -426,6 +429,7 @@ io.on('connection', (socket) => {
       room.players.set(playerId, {
         playerId,
         name,
+        uid: payload?.uid || null,
         score: 0,
         connected: true,
         socketId: socket.id,
