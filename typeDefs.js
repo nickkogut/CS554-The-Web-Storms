@@ -33,6 +33,24 @@ export const typeDefs = `#graphql
     timestamp: String!
   }
 
+  type LeaderboardEntry{
+    rank: Int
+    playerId: String
+    uid: String
+    name: String
+    score: Int
+  }
+
+  type CompletedQuiz {
+    roomId: String
+    quizName: String
+    pin: String
+    totalQuestions: Int
+    numPlayers: Int
+    finishedAt: String
+    leaderboard: [LeaderboardEntry]
+  }
+
 input QuizResultInput {
   name: String!
   moderator_id: String!
@@ -80,8 +98,10 @@ type Query {
   getQuizCatalog: [Quiz]
   getQuizSessionByCode(code: String!): QuizSession
 
+  getGamesUserById(id: String!): [CompletedQuiz]
 
   getUser: User
+  getUserById(id: String!): User
   getFriendRequestsForUser: [FriendRequest]
   getFriendsForUser: [Friend]
 }
