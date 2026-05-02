@@ -3,6 +3,7 @@ import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { gameSocket } from "../socket.js";
 import { TableBody, TableCell, TableContainer, TableHead, TableRow, Typography, Box, Alert, Button, Table, Paper } from "@mui/material";
 import { auth } from "../firebase/FirebaseConfig";
+import userAPI from "./users/userAPI";
 
 function PlayerRoom(){
   const { roomId } = useParams();
@@ -18,6 +19,23 @@ function PlayerRoom(){
   const [submitted, setSubmitted] = useState(false);
   const [timeLeft, setTimeLeft] = useState(0);
   const [error, setError] = useState("");
+  const [friendIds, setFriendIds] = useState(new Set());
+
+  useEffect(() => {
+    let mounted = true;
+    async function loadFriends(){
+      try{
+        if(!auth?.currentUser?.uid) return;
+        const res = await userAPI.friend.get();
+        const list = res?.data?.getFriendsForUser || [];
+        if(mounted) setFriendIds(new Set(list.map(f => f._id)));
+      }catch(e){
+        console.error('could not load friends', e);
+      }
+    }
+    loadFriends();
+    return () => { mounted = false; };
+  }, [auth?.currentUser?.uid]);
 
   useEffect(() => {
     if(!playerId){
@@ -224,7 +242,23 @@ function PlayerRoom(){
                 {room.leaderboard.map((player) => (
                   <TableRow key={player.playerId}>
                     <TableCell>{player.rank}</TableCell>
-                    <TableCell>{player.name}</TableCell>
+                    <TableCell sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Typography>{player.name}</Typography>
+                      </Box>
+                      <Box>
+                        {auth?.currentUser?.uid && player.uid && player.uid !== auth.currentUser.uid && !friendIds.has(player.uid) ? (
+                          <Button size="small" variant="outlined" onClick={async () => {
+                            try{
+                              await userAPI.friend.createRequest(player.uid);
+                              setFriendIds(s => new Set([...Array.from(s), player.uid]));
+                            }catch(e){
+                              console.error('friend request failed', e);
+                            }
+                          }}>Add Friend</Button>
+                        ) : null}
+                      </Box>
+                    </TableCell>
                     <TableCell>{player.score}</TableCell>
                   </TableRow>
                 ))}
