@@ -12,11 +12,8 @@ onAuthStateChanged(auth, (user) => {
     // logged in
     gameSocket.emit("changeStatus", { uid: auth.currentUser.uid, status: "online"});
     gameSocket.emit("joinPersonalRoom", { uid: auth.currentUser.uid });
-  } else {
-    // logged out or closed the page
-    gameSocket.emit("changeStatus", { uid: auth.currentUser?.uid, status: "offline" });
-    gameSocket.emit("leavePersonalRoom", { uid: auth.currentUser?.uid });
-  }
+  } 
+  // Otherwise, the user logged out. Their status will be handled in FirebaseFunctions.js - logOut()
 });
 
 window.addEventListener('beforeunload', () => {

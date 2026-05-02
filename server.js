@@ -86,10 +86,12 @@ const changeStatus = async (uid, newStatus) => {
     
     default:
       // newStatus holds the lobby id/pin
-      status = {status: "in-lobby", code: newStatus}
+      status = {status: "in-lobby", roomId: newStatus}
       userStatusMap[uid] = status;
       notifyFriends(uid, status);
   }
+      console.log("changing status: ", uid, newStatus);
+      console.log(userStatusMap);
 };
 
 function createRoomId() {
@@ -218,6 +220,13 @@ function finishQuiz(io, room){
   })
 
   emitRoomSnapshot(io, room);
+
+    // Update player statuses
+    room.players.forEach((player) => {
+      if (userStatusMap[player.playerId]) {
+        changeStatus(player.playerId, "online");
+      }
+    });
 }
 
 function closeQuestion(io, roomId){
@@ -353,8 +362,9 @@ io.on('connection', (socket) => {
       if(!questions.length){
         throw new Error('No questions found. Please create questions first.');
       }
-      const roomId = createRoomId();
+      // const roomId = createRoomId();
       const pin = createPin();
+      const roomId = pin;
       const room = {
         roomId,
         pin,
@@ -418,6 +428,7 @@ io.on('connection', (socket) => {
     try{
       const pin = ensureString(payload?.pin, 'PIN');
       const name = ensureString(payload?.name, 'Player name');
+      const playerId = payload?.playerId || createRoomId();
       const room = getRoomByPin(pin);
       if(!room){
         throw new Error('Room not found for that PIN');
@@ -425,7 +436,7 @@ io.on('connection', (socket) => {
       if(room.status === 'finished'){
         throw new Error('This quiz has already finished');
       }
-      const playerId = createRoomId();
+
       room.players.set(playerId, {
         playerId,
         name,
@@ -451,6 +462,12 @@ io.on('connection', (socket) => {
         pin: room.pin,
         room: getRoomSnapshot(room)
       });
+
+      if (userStatusMap[playerId]) {
+        changeStatus(playerId, room.pin);
+        io.to(playerId).emit('updateLobbyStatus', {canInvite: true});
+      }
+      
     }
     catch(e){
       callback?.({ ok: false, error: e.message || 'Unable to join room'});
@@ -511,6 +528,14 @@ io.on('connection', (socket) => {
       }
       startQuestion(io, room);
       callback?.({ ok: true });
+
+      // Update player statuses
+      room.players.forEach((player) => {
+        if (userStatusMap[player.playerId]) {
+          changeStatus(player.playerId, "busy");
+          io.to(playerId).emit('updateLobbyStatus', {canInvite: false});
+        }
+      });
     }
     catch(e){
       callback?.({ ok: false, error: e.message || 'Unable to start quiz' });
@@ -608,7 +633,19 @@ io.on('connection', (socket) => {
   });
 
   socket.on('inviteToLobby', async ({uid, friendId}) => {
-    io.to(friendId).emit('lobbyInvite', {id: uid}); // Tells the friend they have been invited. They already know the lobby code
+    io.to(friendId).emit('lobbyInvite', {id: uid}); // Tells the friend they have been invited. They already know the roomId
+  });
+
+  socket.on('acceptFriendRequest', async ({fromId, toId}) => {
+    let status = userStatusMap[fromId] || {status: "offline"};
+    // Relay to the receiver that the accepter confirmed their friend request. Note that DB updates are handled before emitting this
+    io.to(toId).emit('friendsListUpdate', {friendId: fromId, status, friended: true});
+  });
+
+  socket.on('unfriend', async ({fromId, toId}) => {
+    // Relay to the friend that they have been unfriended. This should be silent (no notification), but is reflected in the mailbox
+    // Note that DB updates are handled before emitting this
+    io.to(toId).emit('friendsListUpdate', {friendId: fromId, friended: false});
   });
 
   socket.on('disconnect', () => {
