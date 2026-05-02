@@ -223,8 +223,8 @@ function finishQuiz(io, room){
 
     // Update player statuses
     room.players.forEach((player) => {
-      if (userStatusMap[player.playerId]) {
-        changeStatus(player.playerId, "online");
+      if (player.uid && userStatusMap[player.uid]) {
+        changeStatus(player.uid, "online");
       }
     });
 }
@@ -462,10 +462,10 @@ io.on('connection', (socket) => {
         pin: room.pin,
         room: getRoomSnapshot(room)
       });
-
-      if (userStatusMap[playerId]) {
-        changeStatus(playerId, room.pin);
-        io.to(playerId).emit('updateLobbyStatus', {canInvite: true});
+      const storedPlayer = room.players.get(playerId);
+      if (storedPlayer?.uid && userStatusMap[storedPlayer.uid]) {
+        changeStatus(storedPlayer.uid, room.pin);
+        io.to(storedPlayer.uid).emit('updateLobbyStatus', {canInvite: true});
       }
       
     }
@@ -531,9 +531,9 @@ io.on('connection', (socket) => {
 
       // Update player statuses
       room.players.forEach((player) => {
-        if (userStatusMap[player.playerId]) {
-          changeStatus(player.playerId, "busy");
-          io.to(playerId).emit('updateLobbyStatus', {canInvite: false});
+        if (player.uid && userStatusMap[player.uid]) {
+          changeStatus(player.uid, "busy");
+          io.to(player.uid).emit('updateLobbyStatus', {canInvite: false});
         }
       });
     }
