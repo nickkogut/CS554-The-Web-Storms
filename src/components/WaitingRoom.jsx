@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from "react";
-import { Box, Typography, LinearProgress, Stack } from "@mui/material";
+import { Box, Typography, LinearProgress, Stack, Button } from "@mui/material";
 import { auth } from "../firebase/FirebaseConfig";
 import { gameSocket } from "../socket";
+import userAPI from "./users/userAPI";
 import "./waitingRoom.css";
+import { useRef } from "react";
 
 function formatTime(seconds) {
   const s = Math.max(0, Math.floor(seconds));
@@ -88,6 +90,26 @@ export default function WaitingRoom({
 
   const hostMode = typeof isHost === 'boolean' ? isHost : (role === 'host');
 
+  
+  const visiblePlayers = (live && live.players) || players || [];
+  const [friendIds, setFriendIds] = useState(new Set());
+
+  useEffect(() => {
+    let mounted = true;
+    async function loadFriends(){
+      try{
+        if(!auth?.currentUser?.uid) return;
+        const res = await userAPI.friend.get();
+        const list = res?.data?.getFriendsForUser || [];
+        if(mounted) setFriendIds(new Set(list.map(f => f._id)));
+      }catch(e){
+        console.error('could not load friends', e);
+      }
+    }
+    loadFriends();
+    return () => { mounted = false; };
+  }, [auth?.currentUser?.uid]);
+
   // Internal simple HostPanel rendered inline when user is host. Keeps host UI inside this component.
   function HostPanel() {
     return (
@@ -122,6 +144,31 @@ export default function WaitingRoom({
                   <Typography variant="subtitle1">{displayed.joinedCount} / {displayed.maxPlayers} max players</Typography>
                 ) : null}
                 <Typography variant="body1">Waiting for host to start the quiz...</Typography>
+                {/* show all players to non-hosts while in lobby */}
+                {!hostMode && mode === 'waiting' && visiblePlayers.length > 0 ? (
+                  <Box sx={{ mt: 2, width: '100%' }}>
+                    {visiblePlayers.map((p) => (
+                      <Box key={p.playerId || p.id} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', py: 0.5 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Box sx={{ width: 32, height:32, borderRadius: '50%', bgcolor: 'grey.400', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white' }}>{p.name?.charAt(0) ?? '?'}</Box>
+                          <Typography variant="body1">{p.name || 'Anonymous'}</Typography>
+                        </Box>
+                        <Box>
+                          {auth?.currentUser?.uid && p.uid && p.uid !== auth.currentUser.uid && !friendIds.has(p.uid) ? (
+                            <Button size="small" variant="outlined" onClick={async () => {
+                              try{
+                                await userAPI.friend.createRequest(p.uid);
+                                setFriendIds(s => new Set([...Array.from(s), p.uid]));
+                              }catch(e){
+                                console.error('friend request failed', e);
+                              }
+                            }}>Add Friend</Button>
+                          ) : null}
+                        </Box>
+                      </Box>
+                    ))}
+                  </Box>
+                ) : null}
               </>
             ) : (
               <>

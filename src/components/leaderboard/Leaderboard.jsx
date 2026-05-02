@@ -1,5 +1,8 @@
 import React, { useEffect, useState, useRef } from 'react';
 import './leaderboard.css';
+import { Button } from '@mui/material';
+import { auth } from '../../firebase/FirebaseConfig';
+import userAPI from '../users/userAPI';
 
 // Key used by the game's code to write/read leaderboard data.
 const STORAGE_KEY = 'quiz_leaderboard';
@@ -7,6 +10,7 @@ const STORAGE_KEY = 'quiz_leaderboard';
 export default function Leaderboard() {
 
   const [entries, setEntries] = useState([]);
+  const [friendIds, setFriendIds] = useState(new Set());
   const lastRawRef = useRef(null);  // keep previous raw JSON string to detect changes
 
   // Sample data for now
@@ -88,6 +92,22 @@ export default function Leaderboard() {
     };
   }, []);
 
+  useEffect(() => {
+    let mounted = true;
+    async function loadFriends(){
+      try{
+        if(!auth?.currentUser?.uid) return;
+        const res = await userAPI.friend.get();
+        const list = res?.data?.getFriendsForUser || [];
+        if(mounted) setFriendIds(new Set(list.map(f => f._id)));
+      }catch(e){
+        console.error('could not load friends', e);
+      }
+    }
+    loadFriends();
+    return () => { mounted = false; };
+  }, [auth?.currentUser?.uid]);
+
   return (
     <div className="leaderboard-root">
       <h2 className="leaderboard-title">Leaderboard</h2>
@@ -110,7 +130,18 @@ export default function Leaderboard() {
             {entries.map((e, idx) => (
               <tr key={e.id ?? idx} className={idx === 0 ? 'top' : ''}>
                 <td>{idx + 1}</td>
-                <td className="player-name">{e.name}</td>
+                <td className="player-name" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span>{e.name}</span>
+                  {auth?.currentUser?.uid && (e.uid || e.id) && (e.uid || e.id) !== auth.currentUser.uid && !friendIds.has(e.uid || e.id) ? (
+                    <Button size="small" variant="outlined" onClick={async () => {
+                      try{
+                        const friendId = e.uid || e.id;
+                        await userAPI.friend.createRequest(friendId);
+                        setFriendIds(s => new Set([...Array.from(s), friendId]));
+                      }catch(err){ console.error('friend request failed', err); }
+                    }}>Add Friend</Button>
+                  ) : null}
+                </td>
                 <td className="player-score">{e.score}</td>
               </tr>
             ))}
