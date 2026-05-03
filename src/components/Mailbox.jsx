@@ -81,14 +81,10 @@ export const Mailbox = () => {
   };
 
   const joinFriend = async (roomId, friendId) => {
-    gameSocket.emit('join_room', {pin: roomId, name: currentUser.displayName, playerId: currentUser.uid}, (response) => {
-      if(!response?.ok){
-        // setError(response?.error || "Could not join");
-        return;
-      }
-      navigate(`/play/${response.roomId}?playerId=${response.playerId}`);
-    });
+    // Navigate to the join page with the PIN prefilled so the user can join
     try {
+      setVisible(false);
+      navigate(`/join?pin=${encodeURIComponent(roomId)}`);
       await userAPI.friend.updateLastInteracted(friendId);
     } catch (e) {
       // No action needed

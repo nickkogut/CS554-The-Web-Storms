@@ -633,7 +633,10 @@ io.on('connection', (socket) => {
   });
 
   socket.on('inviteToLobby', async ({uid, friendId}) => {
-    io.to(friendId).emit('lobbyInvite', {id: uid}); // Tells the friend they have been invited. They already know the roomId
+    // include the inviter's current roomId (if any) so the recipient can join directly
+    const status = userStatusMap[uid] || {};
+    const roomId = status.roomId || null;
+    io.to(friendId).emit('lobbyInvite', {id: uid, roomId}); // tells the friend they have been invited and provides the PIN
   });
 
   socket.on('acceptFriendRequest', async ({fromId, toId}) => {
