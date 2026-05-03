@@ -11,4 +11,6 @@ const APIData = {
 };
 const app = initializeApp(APIData);
 
-export const auth = getAuth(app); // All components should import auth instead of using getAuth themselves
+// All components should import auth instead of using getAuth themselves
+export const auth = getAuth(app); 
+export default app;

@@ -8,7 +8,7 @@ export const gameSocket = io(SOCKET_URL,
 );
 
 onAuthStateChanged(auth, (user) => {
-  if (user) {
+  if (user && gameSocket.connected) {
     // logged in
     gameSocket.emit("changeStatus", { uid: auth.currentUser.uid, status: "online"});
     gameSocket.emit("joinPersonalRoom", { uid: auth.currentUser.uid });

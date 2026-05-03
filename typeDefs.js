@@ -2,12 +2,14 @@ export const typeDefs = `#graphql
   type Question {
     questionText: String
     options: [String!]
-    correctOptions: [Int!]!
+    correctOption: Int
+    correctOptions: [Int!]
   }
 
   type Quiz {
     _id: String
     quizName: String
+    createdBy: String
     createdByUid: String
     createdByName: String
     createdAt: String
@@ -71,11 +73,15 @@ export const typeDefs = `#graphql
   input QuestionInput {
     questionText: String!
     options: [String!]!
-    correctOptions: [Int!]!
+    correctOption: Int
+    correctOptions: [Int!]
   }
 
   input QuizInput {
     quizName: String!
+    createdBy: String
+    createdByUid: String
+    createdByName: String
     questions: [QuestionInput!]!
   }
 
