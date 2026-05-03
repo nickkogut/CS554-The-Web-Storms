@@ -2,7 +2,7 @@ export const typeDefs = `#graphql
   type Question {
     questionText: String
     options: [String!]
-    correctOption: Int
+    correctOptions: [Int!]!
   }
 
   type Quiz {
@@ -10,6 +10,9 @@ export const typeDefs = `#graphql
     quizName: String
     createdBy: String
     createdAt: String
+    updatedAt: String
+    copiedFromQuizId: String
+    timesPlayed: Int
     questions: [Question]
   }
 
@@ -31,24 +34,6 @@ export const typeDefs = `#graphql
     from_name: String!
     to_id: String!
     timestamp: String!
-  }
-
-  type LeaderboardEntry{
-    rank: Int
-    playerId: String
-    uid: String
-    name: String
-    score: Int
-  }
-
-  type CompletedQuiz {
-    roomId: String
-    quizName: String
-    pin: String
-    totalQuestions: Int
-    numPlayers: Int
-    finishedAt: String
-    leaderboard: [LeaderboardEntry]
   }
 
 input QuizResultInput {
@@ -85,7 +70,7 @@ type User {
 input QuestionInput {
   questionText: String!
   options: [String!]!
-  correctOption: Int!
+  correctOptions: [Int!]!
 }
 
 input QuizInput {
@@ -96,18 +81,18 @@ input QuizInput {
 
 type Query {
   getQuizCatalog: [Quiz]
+  getQuizById(quizId: String!): Quiz
   getQuizSessionByCode(code: String!): QuizSession
 
-  getGamesUserById(id: String!): [CompletedQuiz]
-
   getUser: User
-  getUserById(id: String!): User
   getFriendRequestsForUser: [FriendRequest]
   getFriendsForUser: [Friend]
 }
 
 type Mutation {
   createQuiz(quiz: QuizInput!): Quiz
+  updateQuiz(quizId: String!, quiz: QuizInput!): Quiz
+  duplicateQuiz(quizId: String!): Quiz
   startQuizSession(quizId: String!): QuizSession
 
   createUser: User
@@ -120,7 +105,6 @@ type Mutation {
   blockUser(friendId: String!): Boolean
   unblockUser(friendId: String!): Boolean
   createFriendRequest(friendId: String!): Boolean
-  processFriendRequest(friendId: String!, accept: Boolean!): Friend
+  processFriendRequest(friendId: String!, accept: Boolean!): Boolean
 }
-
 `;
