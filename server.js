@@ -55,6 +55,11 @@ const changeStatus = async (uid, newStatus) => {
     delete disconnectingUsers[uid];
   }
 
+  if (newStatus?.fromLoad) {
+    // If the user refreshes, their status will automatically be set to Online. If the user already had a different status, don't remove it
+    if (userStatusMap[uid]) return;
+  }
+
   let status; // The status object that will be emitted to friends / stored in userStatusMap
   
   switch(newStatus) {
@@ -90,8 +95,6 @@ const changeStatus = async (uid, newStatus) => {
       userStatusMap[uid] = status;
       notifyFriends(uid, status);
   }
-      console.log("changing status: ", uid, newStatus);
-      console.log(userStatusMap);
 };
 
 function createRoomId() {
@@ -625,7 +628,23 @@ io.on('connection', (socket) => {
     try {
       const req = await createFriendRequest(uid, friendId);
       if (req) {
-        io.to(friendId).emit('friendRequest', {id: uid}); // Notify the recipient. Does nothing if they are offline
+        // If the recipient already sent this user a friend request, then this will have accepted that request instead of making a new one.
+        // Check if that is the case
+        const sender = await getUser(uid);
+        if (sender?.friends && sender.friends.find((f) => f._id === friendId)) {
+          // Notify both users that they have a new friend
+          const senderStatus = userStatusMap[uid] || {status: "offline"};
+          const recipStatus = userStatusMap[friendId] || {status: "offline"};
+        
+          io.to(uid).emit('friendsListUpdate', {friendId, status: recipStatus, friended: true});
+          io.to(friendId).emit('friendsListUpdate', {"friendId": uid, status: senderStatus, friended: true});
+        }
+
+        else {
+          io.to(friendId).emit('friendRequest', {id: uid}); // Notify the recipient. Does nothing if they are offline
+        }
+
+
       }
     } catch (e) {
       return;

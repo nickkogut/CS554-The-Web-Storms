@@ -27,8 +27,6 @@ import SendIcon from '@mui/icons-material/Send';
 import SportsEsportsIcon from '@mui/icons-material/SportsEsports';
 import DoNotDisturbOnIcon from '@mui/icons-material/DoNotDisturbOn';
 
-
-
 export const Mailbox = () => {
   const {currentUser} = useContext(AuthContext);
   const [friendRequests, setFriendRequests] = useState([]);
@@ -131,7 +129,6 @@ export const Mailbox = () => {
       };
 
       const handleFriendStatusUpdate = ({uid, status}) => {
-        // A friend has changed status
         setFriends((prevFriends) => {
           return prevFriends.map((friend) => {
             if (friend._id === uid) {
@@ -149,15 +146,14 @@ export const Mailbox = () => {
 
     const handleFriendsListUpdate = async ({friendId, status, friended}) => {
       if (!friended) {
-        // Unfriended
+        // Unfriended -> Silently remove them from the friends list
         setFriends((prev) => prev.filter((friend) => friend._id !== friendId));
-        // Silently remove them from the friends list
         return;
       }
 
       try {
         // A friend accepted your request
-        const fullFriendsRes = await userAPI.friend.get(currentUser.uid)//.data?.getFriendsForUser || [];
+        const fullFriendsRes = await userAPI.friend.get(currentUser.uid);
         const fullFriends = fullFriendsRes.data?.getFriendsForUser || [];
         if (fullFriends.length == 0) return;
         
@@ -166,6 +162,12 @@ export const Mailbox = () => {
 
         setFriends((prev) => [newFriend, ...prev]);
 
+        // Clear any outstanding requests from them. This happens when you already have a request and then try to send them a request.
+        const requests_res = await userAPI.friend.getRequests();
+        const requests = requests_res.data?.getFriendRequestsForUser || [];
+        setNumNotifications(requests.length + tempNotifications.length);
+        setFriendRequests(requests);
+      
         setNotification({
               component: NewFriendNotification,
               fields: {name: newFriend.name},
@@ -217,10 +219,8 @@ export const Mailbox = () => {
     };
     
     const handleFriendRequest = async ({id}) => {
-      console.log("received req ")
       const requests_res = await userAPI.friend.getRequests();
       const requests = requests_res.data?.getFriendRequestsForUser || [];
-      console.log(friendRequests.length, requests.length)
       if (friendRequests.length >= requests.length) return; // This request was already handled
   
       setNumNotifications((prev) => prev + 1);

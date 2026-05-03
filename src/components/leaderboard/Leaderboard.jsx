@@ -136,7 +136,8 @@ export default function Leaderboard() {
                     <Button size="small" variant="outlined" onClick={async () => {
                       try{
                         const friendId = e.uid || e.id;
-                        await userAPI.friend.createRequest(friendId);
+                        gameSocket.emit("sendFriendRequest", {uid: auth.currentUser.uid, friendId});
+                        // await userAPI.friend.createRequest(friendId);
                         setFriendIds(s => new Set([...Array.from(s), friendId]));
                       }catch(err){ console.error('friend request failed', err); }
                     }}>Add Friend</Button>

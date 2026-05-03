@@ -1,5 +1,6 @@
 import authorizedRequest from '../../../authorizedRequest.js';
 import publicRequest from '../../../publicRequest.js';
+import { gameSocket } from '../../socket.js';
 
 export const userAPI = {
   user: {},
