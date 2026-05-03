@@ -78,13 +78,13 @@ export const updateLastInteracted = async (currId, friendId) => {
     const now = new Date();
 
     const newUser = await usersCollection.updateOne(
-        {_id: currId, "friends.id": friendId},
-        {$set: {"friends.$.last_played": now}}
+        {_id: currId, "friends._id": friendId},
+        {$set: {"friends.$.lastInteracted": now}}
     );
 
     await usersCollection.updateOne(
-        {_id: friendId, "friends.id": currId},
-        {$set: {"friends.$.last_played": now}}
+        {_id: friendId, "friends._id": currId},
+        {$set: {"friends.$.lastInteracted": now}}
     );
 
     return newUser;

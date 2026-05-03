@@ -10,7 +10,7 @@ import { connectRedis } from './config/redisClient.js';
 import { questions as questionCollection } from './config/mongoCollections.js';
 import admin from './src/firebase/FirebaseAdmin.js';
 import { getUser } from './src/components/users/users.js';
-import { createFriendRequest } from './src/components/users/friendRequests.js';
+import { createFriendRequest, updateLastInteracted } from './src/components/users/friendRequests.js';
 import { connectRabbitMQ, publish, QUEUES } from './config/rabbitmq.js';
 
 const GRAPHQL_PORT = Number(process.env.PORT) || 4000;
@@ -516,7 +516,7 @@ io.on('connection', (socket) => {
       });
     }
   });
-  socket.on('start_quiz', (payload, callback) => {
+  socket.on('start_quiz', async (payload, callback) => {
     try{
       const roomId = ensureString(payload?.roomId, 'Room ID');
       const room = rooms.get(roomId);
@@ -530,15 +530,33 @@ io.on('connection', (socket) => {
         throw new Error('At least one player must join before starting');
       }
       startQuestion(io, room);
-      callback?.({ ok: true });
 
       // Update player statuses
-      room.players.forEach((player) => {
+      console.log(room.players, "PLAYERS")
+      room.players.forEach(async (player) => {
         if (player.uid && userStatusMap[player.uid]) {
           changeStatus(player.uid, "busy");
           io.to(player.uid).emit('updateLobbyStatus', {canInvite: false});
+
+          // Set each friend in the lobby as "recently interacted" so they show up at the top ofthe friends list
+          // This will update next time the player refreshes/rejoins the server
+          const user = await getUser(player.uid);
+          const friends = user?.friends;
+          console.log(user, "USER")
+          console.log(friends, "FRIENDS")
+          if (!friends) return;
+          room.players.forEach(async (player2) => {
+            console.log("checking p2uid, ", player2.uid)
+            if (player2.uid && friends.find((f) => f._id === player2.uid)) {
+              console.log("found, should update", player.uid, player2.uid)
+              await updateLastInteracted(player.uid, player2.uid);
+            }
+          });
         }
       });
+
+      callback?.({ ok: true });
+  
     }
     catch(e){
       callback?.({ ok: false, error: e.message || 'Unable to start quiz' });
