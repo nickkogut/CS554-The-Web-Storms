@@ -18,13 +18,21 @@ export default function PlayerGame(){
 
         gameSocket.on('room_snapshot', onRoomSnapshot);
 
+        if (playerId) {
+            gameSocket.emit('player_reconnect', { roomId, playerId }, (response) => {
+                if (response?.ok) {
+                    setRoom(response.room);
+                }
+            });
+        }
+
         return()=>{
             gameSocket.off('room_snapshot', onRoomSnapshot);
         };
     }, []);
 
     if(!room || room.status === 'lobby') {
-        return <WaitingRoom joinedCount={room?.players?.length ?? 0} mode="waiting"/>;
+        return <WaitingRoom joinedCount={room?.players?.length ?? 0} mode="waiting" players={room?.players ?? []}/>;
     }
     else{
         return <PlayerRoom/>;

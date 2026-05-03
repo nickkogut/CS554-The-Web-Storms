@@ -1,6 +1,6 @@
 import { Box, Button, Stack, TextField } from "@mui/material";
 
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useState, useContext, useEffect } from "react";
 import { gameSocket } from "../socket";
 import { AuthContext } from "../context/AuthContext";
@@ -9,7 +9,8 @@ function JoinQuiz(){
     const navigate = useNavigate();
     const {currentUser} = useContext(AuthContext);
     const [name, setName] = useState(currentUser?.displayName || "");
-    const [pin, setPin] = useState("");
+    const [searchParams] = useSearchParams();
+    const [pin, setPin] = useState(() => searchParams.get('pin') || "");
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
     useEffect(()=>{
@@ -20,6 +21,11 @@ function JoinQuiz(){
             setName("");
         }
     },[currentUser, loading]);
+
+    useEffect(() => {
+        const incoming = searchParams.get('pin');
+        if (incoming) setPin(incoming);
+    }, [searchParams]);
 
     
     const handleEnter = (e)=>{
