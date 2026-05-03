@@ -1,12 +1,10 @@
-import React, { useContext, useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useSnackbar } from 'notistack';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import authorizedRequest from '../../authorizedRequest.js';
 
-import AppBar from '@mui/material/AppBar';
 import Box from '@mui/material/Box';
-import Toolbar from '@mui/material/Toolbar';
 import Typography from '@mui/material/Typography';
-import IconButton from '@mui/material/IconButton';
 import Button from '@mui/material/Button';
 import Stack from '@mui/material/Stack';
 import Container from '@mui/material/Container';
@@ -16,19 +14,13 @@ import Divider from '@mui/material/Divider';
 import TextField from '@mui/material/TextField';
 import FormControl from '@mui/material/FormControl';
 import FormLabel from '@mui/material/FormLabel';
-import RadioGroup from '@mui/material/RadioGroup';
+import FormGroup from '@mui/material/FormGroup';
 import FormControlLabel from '@mui/material/FormControlLabel';
-import Radio from '@mui/material/Radio';
 import Checkbox from '@mui/material/Checkbox';
 
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import SendIcon from '@mui/icons-material/Send';
-import MenuIcon from '@mui/icons-material/Menu';
-
-import { AuthContext } from '../context/AuthContext';
-
-const GRAPHQL_URL = 'http://localhost:4000/';
 
 function createBlankQuestion() {
     return {
@@ -48,7 +40,6 @@ function normalizeQuestions(questions) {
 }
 
 export default function ModeratorPage() {
-    const { currentUser } = useContext(AuthContext);
     const { enqueueSnackbar } = useSnackbar();
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
@@ -141,33 +132,23 @@ export default function ModeratorPage() {
             try {
                 setLoadingQuiz(true);
 
-                const query = `
-          query GetQuizById($quizId: String!) {
-            getQuizById(quizId: $quizId) {
-              _id
-              quizName
-              questions {
-                questionText
-                options
-                correctOptions
+                const result = await authorizedRequest({
+                    type: 'query',
+                    query: `
+            query GetQuizById($quizId: String!) {
+              getQuizById(quizId: $quizId) {
+                _id
+                quizName
+                questions {
+                  questionText
+                  options
+                  correctOptions
+                }
               }
             }
-          }
-        `;
-
-                const response = await fetch(GRAPHQL_URL, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        query,
-                        variables: { quizId }
-                    })
+          `,
+                    variables: { quizId }
                 });
-
-                const result = await response.json();
-                if (!response.ok || result.errors?.length) {
-                    throw new Error(result?.errors?.[0]?.message || 'Could not load quiz.');
-                }
 
                 const quiz = result.data?.getQuizById;
                 if (!quiz) throw new Error('Quiz not found.');
@@ -217,40 +198,26 @@ export default function ModeratorPage() {
 
             setIsSubmitting(true);
 
-            const body = quizId
+            const variables = quizId
                 ? {
-                    query: mutation,
-                    variables: {
-                        quizId,
-                        quiz: {
-                            quizName: quizName.trim(),
-                            createdBy: currentUser?.displayName || currentUser?.email || 'Anonymous',
-                            questions: payload
-                        }
+                    quizId,
+                    quiz: {
+                        quizName: quizName.trim(),
+                        questions: payload
                     }
                 }
                 : {
-                    query: mutation,
-                    variables: {
-                        quiz: {
-                            quizName: quizName.trim(),
-                            createdBy: currentUser?.displayName || currentUser?.email || 'Anonymous',
-                            questions: payload
-                        }
+                    quiz: {
+                        quizName: quizName.trim(),
+                        questions: payload
                     }
                 };
 
-            const response = await fetch(GRAPHQL_URL, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(body)
+            const result = await authorizedRequest({
+                type: 'mutation',
+                query: mutation,
+                variables
             });
-
-            const result = await response.json();
-
-            if (!response.ok) {
-                throw new Error(result?.errors?.[0]?.message || 'Failed to save quiz.');
-            }
 
             if (result.errors?.length) {
                 throw new Error(result.errors[0].message);
@@ -266,6 +233,7 @@ export default function ModeratorPage() {
             if (!quizId) {
                 setQuestions([createBlankQuestion()]);
                 setQuizName('');
+                navigate('/my-quizzes');
             } else {
                 navigate('/my-quizzes');
             }
@@ -284,17 +252,6 @@ export default function ModeratorPage() {
 
     return (
         <Box sx={{ minHeight: '100vh', bgcolor: '#f7f8fc' }}>
-            <AppBar position="sticky">
-                <Toolbar variant="dense">
-                    <IconButton edge="start" color="inherit" aria-label="menu" sx={{ mr: 2 }}>
-                        <MenuIcon />
-                    </IconButton>
-                    <Typography variant="h6" color="inherit" component="div">
-                        Quiz Quest Moderator
-                    </Typography>
-                </Toolbar>
-            </AppBar>
-
             <Container maxWidth="lg" sx={{ py: 4 }}>
                 <Stack spacing={3}>
                     <Box>
@@ -302,7 +259,7 @@ export default function ModeratorPage() {
                             {quizId ? 'Edit Quiz' : 'Create Quiz'}
                         </Typography>
                         <Typography variant="body1" color="text.secondary">
-                            Add a quiz name, enter four options, choose one or more correct answers, and send them to the backend.
+                            Add a quiz name, enter four options, choose one or more correct answers, and save them to the backend.
                         </Typography>
                     </Box>
 
@@ -372,7 +329,7 @@ export default function ModeratorPage() {
 
                                     <FormControl>
                                         <FormLabel>Correct options</FormLabel>
-                                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 1 }}>
+                                        <FormGroup row>
                                             {question.options.map((_, optionIndex) => (
                                                 <FormControlLabel
                                                     key={optionIndex}
@@ -385,7 +342,7 @@ export default function ModeratorPage() {
                                                     label={`Option ${optionIndex + 1}`}
                                                 />
                                             ))}
-                                        </Box>
+                                        </FormGroup>
                                     </FormControl>
                                 </Stack>
                             </CardContent>
