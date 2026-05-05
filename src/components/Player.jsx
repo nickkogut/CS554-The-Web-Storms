@@ -9,20 +9,28 @@ export default function Player(){
     const [games, setGames] = useState([]);
 
     useEffect(()=>{
-        const fetchUser = async ()=>{
-            const result = await userAPI.getUserById(id);
-            setUser(result?.data?.getUserById || null);
-            if(!result){
-                alert("No user found");
-            }
-        }
-        fetchUser();
+        if(!id) return;
 
-        const fetchGames = async ()=>{
-            const result = await userAPI.getGamesByUserId(id);
-            setGames(result?.data?.getGamesUserById || []);
+        setUser(null);
+        setGames([]);
+
+        const fetchData = async ()=>{
+            try{
+                const result = await userAPI.getUserById(id);
+                setUser(result?.data?.getUserById || null);
+                if(!result){
+                    alert("No user found");
+                }
+                const gresult = await userAPI.getGamesByUserId(id);
+                setGames(gresult?.data?.getGamesUserById || []);
+            }
+            catch(e){
+                console.log(e);
+                alert("Failed to fetch");
+            }
+
         }
-        fetchGames();
+        fetchData();
 
     },[id])
 
@@ -30,7 +38,7 @@ export default function Player(){
         <Box>
             <Typography variant="h3">Player: {user?.name}</Typography>
             <Typography variant="h6">Recent Games: </Typography>
-            {games.slice(0, 5).map((game, index) => {
+            {games.slice(-5).reverse().map((game, index) => {
                 const playerEntry = game.leaderboard.find(p => p.uid === id);
                 if (!playerEntry) return null;
                 return (
