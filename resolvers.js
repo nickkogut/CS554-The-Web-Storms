@@ -86,6 +86,56 @@ function toGraph(doc) {
   return copy;
 }
 
+// Coerce any value to a string (or null). Handles Date, ObjectId, undefined.
+function toStr(value) {
+  if (value === null || value === undefined) return null;
+  if (value instanceof Date) return value.toISOString();
+  if (typeof value === 'string') return value;
+  if (typeof value.toISOString === 'function') return value.toISOString();
+  if (typeof value.toString === 'function') return value.toString();
+  return String(value);
+}
+
+// Ensure a user document conforms to the strict GraphQL User type, regardless
+// of how/when it was stored. Some users (e.g. seeded ones) lack email; older
+// records may be missing quiz_history; friend timestamps are stored as Date
+// objects that the strict String! scalar can refuse to serialize. Without this
+// normalization, getUser/getUserById can fail with serialization errors even
+// though the underlying record is fine.
+function normalizeUser(doc) {
+  if (!doc) return null;
+
+  const friends = Array.isArray(doc.friends) ? doc.friends : [];
+  const quizHistory = Array.isArray(doc.quiz_history) ? doc.quiz_history : [];
+
+  return {
+    _id: toStr(doc._id) || '',
+    name: doc.name || 'Unknown',
+    email: doc.email || '',
+    friends: friends
+      .filter((f) => f && f._id)
+      .map((f) => ({
+        _id: toStr(f._id) || '',
+        name: f.name || 'Unknown',
+        friendTimestamp: toStr(f.friendTimestamp) || '',
+        lastInteracted: toStr(f.lastInteracted) || ''
+      })),
+    quiz_history: quizHistory
+      .filter((q) => q && typeof q === 'object')
+      .map((q) => ({
+        name: q.name || null,
+        moderator_id: q.moderator_id || null,
+        quiz_id: q.quiz_id || null,
+        questions_correct: typeof q.questions_correct === 'number' ? q.questions_correct : null,
+        questions_total: typeof q.questions_total === 'number' ? q.questions_total : null,
+        placement: typeof q.placement === 'number' ? q.placement : null,
+        num_participants: typeof q.num_participants === 'number' ? q.num_participants : null,
+        timestamp: toStr(q.timestamp),
+        moderator_name: q.moderator_name || null
+      }))
+  };
+}
+
 function generateSessionCode(length = 10) {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   let code = '';
@@ -156,16 +206,40 @@ export const resolvers = {
 
     getFriendsForUser: async (_, __, context) => {
       if (!context.user) throw new GraphQLError("Not authenticated");
-      
+
       const user = await getUser(context.user.uid);
-      return user?.friends || [];
+      return normalizeUser(user)?.friends || [];
     },
 
     getUser: async (_, __, context) => {
       if (!context.user) throw new GraphQLError("Not authenticated");
-      
+
       const user = await getUser(context.user.uid); // Throws if no user found
+<<<<<<< Updated upstream
       return user;
+=======
+      return normalizeUser(user);
+    },
+
+    getUserById: async(_, {id})=>{
+      const user = await getUser(id);
+      if(!user){
+        throw new GraphQLError('User not found', {
+          extensions: { code: 'NOT_FOUND' }
+        });
+      }
+      return normalizeUser(user);
+    },
+
+    getGamesUserById: async(_, {id})=>{
+      const games = await getGames(id);
+      if(!games){
+        throw new GraphQLError('No games found', {
+          extensions: { code: 'NOT_FOUND' }
+        });      
+      }
+      return games;
+>>>>>>> Stashed changes
     }
   },
 

@@ -167,5 +167,53 @@ userAPI.quizHist.add = async (quizResult) => {
   });
 };
 
+<<<<<<< Updated upstream
+=======
+userAPI.getUserById = async (id) => {
+  return publicRequest({
+    query: `
+      query GetUserById($id: String!){
+        getUserById(id: $id){
+          _id
+          name
+          email
+          friends {
+            _id
+            name
+            friendTimestamp
+            lastInteracted
+          }
+        }
+      }
+    `,
+    variables: { id }
+  });
+};
+
+userAPI.getGamesByUserId = async (id) => {
+  return publicRequest({
+    query: `
+      query GetGamesByUserId($id: String!){
+        getGamesUserById(id: $id){
+          roomId
+          quizName
+          pin
+          numPlayers
+          finishedAt
+          leaderboard {
+            rank
+            playerId
+            uid
+            name
+            score
+          }
+        }
+      }
+    `,
+    variables: { id }
+  });
+};
+
+>>>>>>> Stashed changes
 
 export default userAPI;
