@@ -86,7 +86,6 @@ function toGraph(doc) {
   return copy;
 }
 
-// Coerce any value to a string (or null). Handles Date, ObjectId, undefined.
 function toStr(value) {
   if (value === null || value === undefined) return null;
   if (value instanceof Date) return value.toISOString();
@@ -96,12 +95,6 @@ function toStr(value) {
   return String(value);
 }
 
-// Ensure a user document conforms to the strict GraphQL User type, regardless
-// of how/when it was stored. Some users (e.g. seeded ones) lack email; older
-// records may be missing quiz_history; friend timestamps are stored as Date
-// objects that the strict String! scalar can refuse to serialize. Without this
-// normalization, getUser/getUserById can fail with serialization errors even
-// though the underlying record is fine.
 function normalizeUser(doc) {
   if (!doc) return null;
 
@@ -214,10 +207,9 @@ export const resolvers = {
     getUser: async (_, __, context) => {
       if (!context.user) throw new GraphQLError("Not authenticated");
 
-      const user = await getUser(context.user.uid); // Throws if no user found
-<<<<<<< Updated upstream
+      const user = await getUser(context.user.uid);
+
       return user;
-=======
       return normalizeUser(user);
     },
 
@@ -239,7 +231,6 @@ export const resolvers = {
         });      
       }
       return games;
->>>>>>> Stashed changes
     }
   },
 
@@ -314,7 +305,7 @@ export const resolvers = {
       await saveSessionToRedis(session);
       return session;
     },
-
+    
     // User Mutations
     createUser: async (_, __, context) => {
     if (!context.user) throw new GraphQLError("Not authenticated");
