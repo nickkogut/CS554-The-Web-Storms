@@ -1,6 +1,8 @@
 services:
   frontend:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
     ports:
       - "5173:5173"
     env_file: .env
@@ -9,7 +11,9 @@ services:
       - redis
 
   backend:
-    build: .
+    build: 
+      context: .
+      dockerfile: Dockerfile.backend
     ports:
       - "4000:4000"
       - "4001:4001"
@@ -21,8 +25,19 @@ services:
         condition: service_started
       rabbitmq:
         condition: service_healthy
-    command: node server.js
-
+  quiz-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    env_file: .env
+    depends_on:
+      mongo:
+        condition: service_started
+      redis:
+        condition: service_started
+      rabbitmq:
+        condition: service_healthy
+    command: node src/workers/quizResultWorker.js        
   mongo:
     image: mongo
     ports:
@@ -48,18 +63,6 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-
-  quiz-worker:
-    build: .
-    env_file: .env
-    depends_on:
-      mongo:
-        condition: service_started
-      redis:
-        condition: service_started
-      rabbitmq:
-        condition: service_healthy
-    command: node src/workers/quizResultWorker.js
 
 volumes:
   mongo-data:
