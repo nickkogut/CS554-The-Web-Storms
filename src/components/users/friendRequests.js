@@ -78,13 +78,13 @@ export const updateLastInteracted = async (currId, friendId) => {
     const now = new Date();
 
     const newUser = await usersCollection.updateOne(
-        {_id: currId, "friends.id": friendId},
-        {$set: {"friends.$.last_played": now}}
+        {_id: currId, "friends._id": friendId},
+        {$set: {"friends.$.lastInteracted": now}}
     );
 
     await usersCollection.updateOne(
-        {_id: friendId, "friends.id": currId},
-        {$set: {"friends.$.last_played": now}}
+        {_id: friendId, "friends._id": currId},
+        {$set: {"friends.$.lastInteracted": now}}
     );
 
     return newUser;
@@ -177,8 +177,8 @@ export const createFriendRequest = async (currId, friendId) => {
     // Check if the target user already sent the current user a request. If so, accept it
     const reverseRequest = await requestsCollection.findOne({from_id: friendId, to_id: currId});
     if (reverseRequest) {
-        await processFriendRequest(currId, reverseRequest._id, true);
-        return false;
+        await processFriendRequest(currId, friendId, true);
+        return true;
     }
 
     // Send the request or update the timestamp on an existing one

@@ -247,7 +247,8 @@ function PlayerRoom(){
                         {auth?.currentUser?.uid && player.uid && player.uid !== auth.currentUser.uid && !friendIds.has(player.uid) ? (
                           <Button size="small" variant="outlined" onClick={async () => {
                             try{
-                              await userAPI.friend.createRequest(player.uid);
+                              // await userAPI.friend.createRequest(player.uid);
+                              gameSocket.emit("sendFriendRequest", {uid: auth.currentUser.uid, friendId: player.uid});
                               setFriendIds(s => new Set([...Array.from(s), player.uid]));
                             }catch(e){
                               console.error('friend request failed', e);

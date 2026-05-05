@@ -10,7 +10,7 @@ export const gameSocket = io(SOCKET_URL,
 onAuthStateChanged(auth, (user) => {
   if (user) {
     // logged in
-    gameSocket.emit("changeStatus", { uid: auth.currentUser.uid, status: "online"});
+    gameSocket.emit("changeStatus", { uid: auth.currentUser.uid, status: "online", fromLoad: true});
     gameSocket.emit("joinPersonalRoom", { uid: auth.currentUser.uid });
   } 
   // Otherwise, the user logged out. Their status will be handled in FirebaseFunctions.js - logOut()

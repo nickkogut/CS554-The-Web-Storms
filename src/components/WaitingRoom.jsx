@@ -157,7 +157,8 @@ export default function WaitingRoom({
                           {auth?.currentUser?.uid && p.uid && p.uid !== auth.currentUser.uid && !friendIds.has(p.uid) ? (
                             <Button size="small" variant="outlined" onClick={async () => {
                               try{
-                                await userAPI.friend.createRequest(p.uid);
+                                // await userAPI.friend.createRequest(p.uid);
+                                gameSocket.emit("sendFriendRequest", {uid: auth.currentUser.uid, friendId: p.uid});
                                 setFriendIds(s => new Set([...Array.from(s), p.uid]));
                               }catch(e){
                                 console.error('friend request failed', e);

@@ -10,7 +10,7 @@ import { connectRedis } from './config/redisClient.js';
 import { questions as questionCollection } from './config/mongoCollections.js';
 import admin from './src/firebase/FirebaseAdmin.js';
 import { getUser } from './src/components/users/users.js';
-import { createFriendRequest } from './src/components/users/friendRequests.js';
+import { createFriendRequest, updateLastInteracted } from './src/components/users/friendRequests.js';
 import { connectRabbitMQ, publish, QUEUES } from './config/rabbitmq.js';
 
 const GRAPHQL_PORT = Number(process.env.PORT) || 4000;
@@ -55,6 +55,11 @@ const changeStatus = async (uid, newStatus) => {
     delete disconnectingUsers[uid];
   }
 
+  if (newStatus?.fromLoad) {
+    // If the user refreshes, their status will automatically be set to Online. If the user already had a different status, don't remove it
+    if (userStatusMap[uid]) return;
+  }
+
   let status; // The status object that will be emitted to friends / stored in userStatusMap
   
   switch(newStatus) {
@@ -90,8 +95,6 @@ const changeStatus = async (uid, newStatus) => {
       userStatusMap[uid] = status;
       notifyFriends(uid, status);
   }
-      console.log("changing status: ", uid, newStatus);
-      console.log(userStatusMap);
 };
 
 function createRoomId() {
@@ -513,7 +516,7 @@ io.on('connection', (socket) => {
       });
     }
   });
-  socket.on('start_quiz', (payload, callback) => {
+  socket.on('start_quiz', async (payload, callback) => {
     try{
       const roomId = ensureString(payload?.roomId, 'Room ID');
       const room = rooms.get(roomId);
@@ -527,15 +530,33 @@ io.on('connection', (socket) => {
         throw new Error('At least one player must join before starting');
       }
       startQuestion(io, room);
-      callback?.({ ok: true });
 
       // Update player statuses
-      room.players.forEach((player) => {
+      console.log(room.players, "PLAYERS")
+      room.players.forEach(async (player) => {
         if (player.uid && userStatusMap[player.uid]) {
           changeStatus(player.uid, "busy");
           io.to(player.uid).emit('updateLobbyStatus', {canInvite: false});
+
+          // Set each friend in the lobby as "recently interacted" so they show up at the top ofthe friends list
+          // This will update next time the player refreshes/rejoins the server
+          const user = await getUser(player.uid);
+          const friends = user?.friends;
+          console.log(user, "USER")
+          console.log(friends, "FRIENDS")
+          if (!friends) return;
+          room.players.forEach(async (player2) => {
+            console.log("checking p2uid, ", player2.uid)
+            if (player2.uid && friends.find((f) => f._id === player2.uid)) {
+              console.log("found, should update", player.uid, player2.uid)
+              await updateLastInteracted(player.uid, player2.uid);
+            }
+          });
         }
       });
+
+      callback?.({ ok: true });
+  
     }
     catch(e){
       callback?.({ ok: false, error: e.message || 'Unable to start quiz' });
@@ -625,7 +646,23 @@ io.on('connection', (socket) => {
     try {
       const req = await createFriendRequest(uid, friendId);
       if (req) {
-        io.to(friendId).emit('friendRequest', {id: uid}); // Notify the recipient. Does nothing if they are offline
+        // If the recipient already sent this user a friend request, then this will have accepted that request instead of making a new one.
+        // Check if that is the case
+        const sender = await getUser(uid);
+        if (sender?.friends && sender.friends.find((f) => f._id === friendId)) {
+          // Notify both users that they have a new friend
+          const senderStatus = userStatusMap[uid] || {status: "offline"};
+          const recipStatus = userStatusMap[friendId] || {status: "offline"};
+        
+          io.to(uid).emit('friendsListUpdate', {friendId, status: recipStatus, friended: true});
+          io.to(friendId).emit('friendsListUpdate', {"friendId": uid, status: senderStatus, friended: true});
+        }
+
+        else {
+          io.to(friendId).emit('friendRequest', {id: uid}); // Notify the recipient. Does nothing if they are offline
+        }
+
+
       }
     } catch (e) {
       return;
