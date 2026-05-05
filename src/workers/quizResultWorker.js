@@ -4,7 +4,7 @@ import {dbConnection} from '../../config/mongoConnection.js';
 
 const RABBITMQ_URL = process.env.RABBITMQ_URL ||  'amqp://guest:guest@localhost:5672';
 
-async function start(){
+export async function startUp(){
     const db = await dbConnection();
     const collection = db.collection('completedQuizzes');
 
@@ -28,5 +28,3 @@ async function start(){
         }
     })
 }
-
-start();

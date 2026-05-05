@@ -1,4 +1,5 @@
 import amqplib from 'amqplib';
+import { startUp } from '../src/workers/quizResultWorker.js';
 
 const RABBITMQ_URL = process.env.RABBITMQ_URL || 'amqp://guest:guest@localhost:5672';
 
@@ -10,6 +11,7 @@ let channel = null;
 
 export async function connectRabbitMQ(){
     const connection = await connectWithRetry(process.env.RABBITMQ_URL);
+    await startUp();
     channel = await connection.createChannel();
     await channel.assertQueue(QUEUES.QUIZ_RESULT, {durable: true});
     console.log('RabbitMQ connected');
