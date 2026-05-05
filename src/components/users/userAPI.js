@@ -167,8 +167,6 @@ userAPI.quizHist.add = async (quizResult) => {
   });
 };
 
-<<<<<<< Updated upstream
-=======
 userAPI.getUserById = async (id) => {
   return publicRequest({
     query: `
@@ -214,6 +212,5 @@ userAPI.getGamesByUserId = async (id) => {
   });
 };
 
->>>>>>> Stashed changes
 
 export default userAPI;
