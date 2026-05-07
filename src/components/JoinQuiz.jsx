@@ -1,4 +1,4 @@
-import { Box, Button, Stack, TextField } from "@mui/material";
+import { Box, Button, Stack, TextField, Alert } from "@mui/material";
 
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useState, useContext, useEffect } from "react";
@@ -63,6 +63,7 @@ function JoinQuiz(){
                 value={pin}
                 onChange={(e)=>setPin(e.target.value)}
             ></TextField>
+            {error && <Alert severity="error">{error}</Alert>}
             <Button variant="contained" type="submit" disabled={!pin || !name || loading}>
                 {loading ? "Joining..." : "Join Quiz"}
                 </Button>

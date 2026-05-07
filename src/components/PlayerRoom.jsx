@@ -157,10 +157,9 @@ function PlayerRoom(){
   return (
     <Box sx={{ display: "flex", flexDirection: "column", minHeight: "75vh", fontFamily: "Gill Sans, sans-serif" }}>
       <Box>
-        <Typography variant="h1">Player Room</Typography>
-
         {room ? (
           <>
+            <Typography variant="h1">{room.quizName}</Typography>
             <Typography variant="body1" fontWeight="bold">PIN: {room.pin}</Typography>
             <Typography variant="body1" fontWeight="bold">Status: {room.status}</Typography>
             <Typography variant="body1" fontWeight="bold">Your Score: {me ? me.score : 0}</Typography>
@@ -177,14 +176,15 @@ function PlayerRoom(){
 
       {question ? (
         <Box>
-          <Typography variant="h2">
+          <Typography variant="h3">
             Question {question.questionIndex + 1} of {question.totalQuestions}
           </Typography>
-          <Typography variant="body1">{question.questionText}</Typography>
+          <Typography variant="subtitle1">{question.questionText}</Typography>
 
-          <Box>
+          <Box sx={{mt: 2, display: "flex", flexDirection: "column", gap: 1}}>
             {question.options.map((option, index) => (
               <Button
+                sx={{width: "70%", alignSelf: "center"}}
                 key={index}
                 onClick={() => {
                   if(!submitted){
@@ -192,6 +192,7 @@ function PlayerRoom(){
                   }
                 }}
                 disabled={submitted}
+                variant={(selectedOption === index) ? "contained" : "outlined"}
               >
                 {index + 1}. {option}
               </Button>
@@ -210,7 +211,7 @@ function PlayerRoom(){
 
       {questionClosed ? (
         <Box>
-          <Typography variant="h2">Round Result</Typography>
+          <Typography variant="h3">Round Result</Typography>
           <Typography variant="body1">
             <strong>Correct Option:</strong> Option {questionClosed.correctOption + 1}
           </Typography>
@@ -224,22 +225,22 @@ function PlayerRoom(){
 
       {room?.leaderboard?.length ? (
         <Box>
-          <Typography variant="h2">Live Leaderboard</Typography>
+          <Typography variant="h3">Leaderboard</Typography>
 
           <TableContainer>
             <Table>
               <TableHead>
-                <tr>
-                  <th>#</th>
-                  <th>Player</th>
-                  <th>Score</th>
-                </tr>
+                <TableRow>
+                  <TableCell align="center">#</TableCell>
+                  <TableCell align="center">Player</TableCell>
+                  <TableCell align="center">Score</TableCell>
+                </TableRow>
               </TableHead>
               <TableBody>
                 {room.leaderboard.map((player) => (
                   <TableRow key={player.playerId}>
-                    <TableCell>{player.rank}</TableCell>
-                    <TableCell sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <TableCell align="center">{player.rank}</TableCell>
+                    <TableCell sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                         <Typography>{player.name}</Typography>
                       </Box>
@@ -247,7 +248,6 @@ function PlayerRoom(){
                         {auth?.currentUser?.uid && player.uid && player.uid !== auth.currentUser.uid && !friendIds.has(player.uid) ? (
                           <Button size="small" variant="outlined" onClick={async () => {
                             try{
-                              // await userAPI.friend.createRequest(player.uid);
                               gameSocket.emit("sendFriendRequest", {uid: auth.currentUser.uid, friendId: player.uid});
                               setFriendIds(s => new Set([...Array.from(s), player.uid]));
                             }catch(e){
@@ -257,7 +257,7 @@ function PlayerRoom(){
                         ) : null}
                       </Box>
                     </TableCell>
-                    <TableCell>{player.score}</TableCell>
+                    <TableCell align="center">{player.score}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>

@@ -180,8 +180,6 @@ export default function QuizCatalog() {
             const fullSession = { ...gqlSession, roomId: roomResponse.roomId, pin: roomResponse.pin };
             setSessionsByQuizId((prev) => ({ ...prev, [quiz._id]: fullSession }));
             enqueueSnackbar(`Session started for "${quiz.quizName}".`, { variant: 'success' });
-            console.log('roomResponse:', roomResponse);
-console.log('fullSession:', fullSession);
             return fullSession;
         } catch (error) {
             enqueueSnackbar(error.message || 'Something went wrong.', { variant: 'error' });
