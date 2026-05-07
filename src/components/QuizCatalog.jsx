@@ -1,14 +1,10 @@
-import React, { useContext, useEffect, useMemo, useState } from 'react';
-import { useSnackbar } from 'notistack';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useSnackbar } from 'notistack';
+import authorizedRequest from '../../authorizedRequest.js';
 
-import { gameSocket } from '../socket';
-
-import AppBar from '@mui/material/AppBar';
 import Box from '@mui/material/Box';
-import Toolbar from '@mui/material/Toolbar';
 import Typography from '@mui/material/Typography';
-import IconButton from '@mui/material/IconButton';
 import Button from '@mui/material/Button';
 import Stack from '@mui/material/Stack';
 import Container from '@mui/material/Container';
@@ -17,23 +13,25 @@ import CardContent from '@mui/material/CardContent';
 import Divider from '@mui/material/Divider';
 import TextField from '@mui/material/TextField';
 import Chip from '@mui/material/Chip';
+import FormControl from '@mui/material/FormControl';
+import InputLabel from '@mui/material/InputLabel';
+import Select from '@mui/material/Select';
+import MenuItem from '@mui/material/MenuItem';
 
-import MenuIcon from '@mui/icons-material/Menu';
 import SearchIcon from '@mui/icons-material/Search';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
-import RefreshIcon from '@mui/icons-material/Refresh';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import ShareIcon from '@mui/icons-material/Share';
 import MailOutlineIcon from '@mui/icons-material/MailOutline';
 import WhatsAppIcon from '@mui/icons-material/WhatsApp';
-
-import { AuthContext } from '../context/AuthContext';
-
-const GRAPHQL_URL = 'http://localhost:4000/';
+import EditIcon from '@mui/icons-material/Edit';
+import ContentCopyAllIcon from '@mui/icons-material/ContentCopy';
+import DeleteIcon from '@mui/icons-material/Delete';
+import RefreshIcon from '@mui/icons-material/Refresh';
 
 function formatDate(value) {
     if (!value) return '—';
-    const date = new Date(value); ``
+    const date = new Date(value);
     if (Number.isNaN(date.getTime())) return '—';
     return date.toLocaleString();
 }
@@ -44,53 +42,39 @@ function buildShareMessage(code, quizName) {
 }
 
 export default function QuizCatalog() {
-    const navigate = useNavigate();
-    const { currentUser } = useContext(AuthContext);
     const { enqueueSnackbar } = useSnackbar();
+    const navigate = useNavigate();
 
     const [quizzes, setQuizzes] = useState([]);
     const [search, setSearch] = useState('');
-    const [scope, setScope] = useState('mine'); // mine | all
+    const [sortBy, setSortBy] = useState('name');
     const [loading, setLoading] = useState(true);
     const [sessionsByQuizId, setSessionsByQuizId] = useState({});
 
-    const myIdentity = useMemo(() => {
-        return currentUser?.displayName || currentUser?.email || '';
-    }, [currentUser]);
-
     const loadCatalog = async () => {
         setLoading(true);
-
         try {
-            const query = `
-        query GetQuizCatalog {
-          getQuizCatalog {
-            _id
-            quizName
-            createdBy
-            createdAt
-            questions {
-              questionText
-              options
-              correctOption
+            const result = await authorizedRequest({
+                type: 'query',
+                query: `
+          query GetQuizCatalog {
+            getQuizCatalog {
+              _id
+              quizName
+              createdByUid
+              createdByName
+              createdAt
+              updatedAt
+              timesPlayed
+              questions {
+                questionText
+                options
+                correctOptions
+              }
             }
           }
-        }
-      `;
-
-            const response = await fetch(GRAPHQL_URL, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ query })
+        `
             });
-
-            const result = await response.json();
-
-            if (!response.ok || result.errors?.length) {
-                throw new Error(result?.errors?.[0]?.message || 'Could not load quizzes.');
-            }
 
             setQuizzes(Array.isArray(result.data?.getQuizCatalog) ? result.data.getQuizCatalog : []);
         } catch (error) {
@@ -108,33 +92,33 @@ export default function QuizCatalog() {
 
     const filteredQuizzes = useMemo(() => {
         const q = search.trim().toLowerCase();
-        let list = quizzes;
 
-        if (scope === 'mine' && myIdentity) {
-            list = list.filter(
-                (quiz) => (quiz.createdBy || '').toLowerCase() === myIdentity.toLowerCase()
+        let list = quizzes.filter((quiz) => {
+            if (!q) return true;
+            const name = (quiz.quizName || '').toLowerCase();
+            const creatorName = (quiz.createdByName || '').toLowerCase();
+            const creatorUid = (quiz.createdByUid || '').toLowerCase();
+            return name.includes(q) || creatorName.includes(q) || creatorUid.includes(q);
+        });
+
+        const sorted = [...list];
+        if (sortBy === 'name') {
+            sorted.sort((a, b) => (a.quizName || '').localeCompare(b.quizName || ''));
+        } else if (sortBy === 'creator') {
+            sorted.sort((a, b) =>
+                (a.createdByName || a.createdByUid || '').localeCompare(b.createdByName || b.createdByUid || '')
             );
+        } else if (sortBy === 'plays') {
+            sorted.sort((a, b) => (b.timesPlayed || 0) - (a.timesPlayed || 0));
         }
 
-        if (q) {
-            list = list.filter((quiz) => {
-                const quizName = (quiz.quizName || '').toLowerCase();
-                const createdBy = (quiz.createdBy || '').toLowerCase();
-                const sessionCode = (sessionsByQuizId[quiz._id]?.code || '').toLowerCase();
-                return (
-                    quizName.includes(q) ||
-                    createdBy.includes(q) ||
-                    sessionCode.includes(q)
-                );
-            });
-        }
-
-        return list;
-    }, [quizzes, search, scope, myIdentity, sessionsByQuizId]);
+        return sorted;
+    }, [quizzes, search, sortBy]);
 
     const startSession = async (quiz) => {
-        try {
-            const mutation = `
+        const result = await authorizedRequest({
+            type: 'mutation',
+            query: `
         mutation StartQuizSession($quizId: String!) {
           startQuizSession(quizId: $quizId) {
             code
@@ -142,56 +126,23 @@ export default function QuizCatalog() {
             quiz {
               _id
               quizName
-              createdBy
-              createdAt
             }
           }
         }
-      `;
+      `,
+            variables: { quizId: quiz._id }
+        });
 
-            const response = await fetch(GRAPHQL_URL, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    query: mutation,
-                    variables: { quizId: quiz._id }
-                })
-            });
+        const session = result.data?.startQuizSession;
+        if (!session) throw new Error('Could not start session.');
 
-            const result = await response.json();
+        setSessionsByQuizId((prev) => ({
+            ...prev,
+            [quiz._id]: session
+        }));
 
-            if (!response.ok || result.errors?.length) {
-                throw new Error(result?.errors?.[0]?.message || 'Could not start session.');
-            }
-
-            const gqlSession = result.data.startQuizSession;
-            const roomResponse = await new Promise((resolve, reject) => {
-                gameSocket.emit(
-                    'create_room',
-                    { hostName: currentUser?.displayName || 'Host', questions: quiz.questions, quizName: quiz.quizName },
-                    (res) => {
-                        if (!res?.ok) reject(new Error('Could not create game room.'));
-                        else resolve(res);
-                    }
-                );
-            });
-            const fullSession = { ...gqlSession, roomId: roomResponse.roomId, pin: roomResponse.pin };
-            setSessionsByQuizId((prev) => ({ ...prev, [quiz._id]: fullSession }));
-            enqueueSnackbar(`Session started for "${quiz.quizName}".`, { variant: 'success' });
-            console.log('roomResponse:', roomResponse);
-console.log('fullSession:', fullSession);
-            return fullSession;
-        } catch (error) {
-            enqueueSnackbar(error.message || 'Something went wrong.', { variant: 'error' });
-            return null;
-        }
+        return session;
     };
-
-    const enterWaiting = async (sessionCode)=>{
-        navigate(`/host-room/${sessionCode}`);
-    }
 
     const ensureSession = async (quiz) => {
         const existing = sessionsByQuizId[quiz._id];
@@ -200,11 +151,9 @@ console.log('fullSession:', fullSession);
     };
 
     const handleCopyCode = async (quiz) => {
-        const session = await ensureSession(quiz);
-        if (!session?.pin) return;
-
         try {
-            await navigator.clipboard.writeText(session.pin);
+            const session = await ensureSession(quiz);
+            await navigator.clipboard.writeText(session.code);
             enqueueSnackbar('Quiz code copied to clipboard.', { variant: 'success' });
         } catch {
             enqueueSnackbar('Could not copy the quiz code.', { variant: 'error' });
@@ -212,12 +161,10 @@ console.log('fullSession:', fullSession);
     };
 
     const handleNativeShare = async (quiz) => {
-        const session = await ensureSession(quiz);
-        if (!session?.pin) return;
-
-        const shareText = buildShareMessage(session.pin, quiz.quizName);
-
         try {
+            const session = await ensureSession(quiz);
+            const shareText = buildShareMessage(session.code, quiz.quizName);
+
             if (navigator.share) {
                 await navigator.share({
                     title: 'QuizQuest quiz',
@@ -237,34 +184,76 @@ console.log('fullSession:', fullSession);
 
     const handleEmailShare = async (quiz) => {
         const session = await ensureSession(quiz);
-        if (!session?.pin) return;
-
         const subject = encodeURIComponent(`Join my QuizQuest quiz: ${quiz.quizName}`);
-        const body = encodeURIComponent(buildShareMessage(session.pin, quiz.quizName));
+        const body = encodeURIComponent(buildShareMessage(session.code, quiz.quizName));
         window.open(`mailto:?subject=${subject}&body=${body}`, '_blank', 'noopener,noreferrer');
     };
 
     const handleWhatsAppShare = async (quiz) => {
         const session = await ensureSession(quiz);
-        if (!session?.pin) return;
-
-        const text = encodeURIComponent(buildShareMessage(session.pin, quiz.quizName));
+        const text = encodeURIComponent(buildShareMessage(session.code, quiz.quizName));
         window.open(`https://wa.me/?text=${text}`, '_blank', 'noopener,noreferrer');
+    };
+
+    const handleEdit = (quiz) => {
+        navigate(`/create-quiz?quizId=${quiz._id}`);
+    };
+
+    const handleDuplicate = async (quiz) => {
+        try {
+            const result = await authorizedRequest({
+                type: 'mutation',
+                query: `
+          mutation DuplicateQuiz($quizId: String!) {
+            duplicateQuiz(quizId: $quizId) {
+              _id
+              quizName
+            }
+          }
+        `,
+                variables: { quizId: quiz._id }
+            });
+
+            if (result.errors?.length) {
+                throw new Error(result.errors[0].message);
+            }
+
+            enqueueSnackbar(`Quiz duplicated as "${result.data.duplicateQuiz.quizName}".`, {
+                variant: 'success'
+            });
+            await loadCatalog();
+        } catch (error) {
+            enqueueSnackbar(error.message || 'Something went wrong.', { variant: 'error' });
+        }
+    };
+
+    const handleDelete = async (quiz) => {
+        if (!window.confirm(`Delete "${quiz.quizName}"?`)) return;
+
+        try {
+            const result = await authorizedRequest({
+                type: 'mutation',
+                query: `
+          mutation DeleteQuiz($quizId: String!) {
+            deleteQuiz(quizId: $quizId)
+          }
+        `,
+                variables: { quizId: quiz._id }
+            });
+
+            if (result.errors?.length) {
+                throw new Error(result.errors[0].message);
+            }
+
+            enqueueSnackbar('Quiz deleted successfully.', { variant: 'success' });
+            await loadCatalog();
+        } catch (error) {
+            enqueueSnackbar(error.message || 'Could not delete quiz.', { variant: 'error' });
+        }
     };
 
     return (
         <Box sx={{ minHeight: '100vh', bgcolor: '#f7f8fc' }}>
-            <AppBar position="sticky">
-                <Toolbar variant="dense">
-                    <IconButton edge="start" color="inherit" aria-label="menu" sx={{ mr: 2 }}>
-                        <MenuIcon />
-                    </IconButton>
-                    <Typography variant="h6" color="inherit" component="div">
-                        Quiz Quest Catalog
-                    </Typography>
-                </Toolbar>
-            </AppBar>
-
             <Container maxWidth="lg" sx={{ py: 4 }}>
                 <Stack spacing={3}>
                     <Box>
@@ -272,7 +261,7 @@ console.log('fullSession:', fullSession);
                             Quiz Catalog
                         </Typography>
                         <Typography variant="body1" color="text.secondary">
-                            Browse quizzes you created, search by code, and start a session.
+                            Browse every saved quiz, sort it, duplicate it, delete it, or start a session.
                         </Typography>
                     </Box>
 
@@ -282,7 +271,7 @@ console.log('fullSession:', fullSession);
                                 <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} alignItems="center">
                                     <TextField
                                         fullWidth
-                                        label="Search by Quiz Name, Quiz Code or Quiz Creator"
+                                        label="Search by name or creator"
                                         value={search}
                                         onChange={(e) => setSearch(e.target.value)}
                                         InputProps={{
@@ -300,22 +289,19 @@ console.log('fullSession:', fullSession);
                                     </Button>
                                 </Stack>
 
-                                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
-                                    <Chip
-                                        label="My quizzes"
-                                        clickable
-                                        variant={scope === 'mine' ? 'filled' : 'outlined'}
-                                        color={scope === 'mine' ? 'primary' : 'default'}
-                                        onClick={() => setScope('mine')}
-                                    />
-                                    <Chip
-                                        label="All quizzes"
-                                        clickable
-                                        variant={scope === 'all' ? 'filled' : 'outlined'}
-                                        color={scope === 'all' ? 'primary' : 'default'}
-                                        onClick={() => setScope('all')}
-                                    />
-                                </Stack>
+                                <FormControl fullWidth size="small">
+                                    <InputLabel id="sort-by-label">Sort by</InputLabel>
+                                    <Select
+                                        labelId="sort-by-label"
+                                        label="Sort by"
+                                        value={sortBy}
+                                        onChange={(e) => setSortBy(e.target.value)}
+                                    >
+                                        <MenuItem value="name">Name</MenuItem>
+                                        <MenuItem value="creator">Creator</MenuItem>
+                                        <MenuItem value="plays">Times played</MenuItem>
+                                    </Select>
+                                </FormControl>
                             </Stack>
                         </CardContent>
                     </Card>
@@ -340,7 +326,6 @@ console.log('fullSession:', fullSession);
                         ) : (
                             filteredQuizzes.map((quiz) => {
                                 const session = sessionsByQuizId[quiz._id];
-                                const sessionCode = (sessionsByQuizId[quiz._id]?.code || '').toLowerCase();
 
                                 return (
                                     <Card key={quiz._id} variant="outlined" sx={{ borderRadius: 3 }}>
@@ -357,7 +342,10 @@ console.log('fullSession:', fullSession);
                                                             {quiz.quizName || 'Untitled Quiz'}
                                                         </Typography>
                                                         <Typography variant="body2" color="text.secondary">
-                                                            Created by {quiz.createdBy || 'Anonymous'} • {formatDate(quiz.createdAt)}
+                                                            Created by {quiz.createdByName || quiz.createdByUid || 'Anonymous'} • {formatDate(quiz.createdAt)}
+                                                        </Typography>
+                                                        <Typography variant="body2" color="text.secondary">
+                                                            Times played: {quiz.timesPlayed || 0}
                                                         </Typography>
                                                     </Box>
 
@@ -371,7 +359,10 @@ console.log('fullSession:', fullSession);
                                                     <Button
                                                         variant="contained"
                                                         startIcon={<PlayArrowIcon />}
-                                                        onClick={() => startSession(quiz)}
+                                                        onClick={async () => {
+                                                            const s = await ensureSession(quiz);
+                                                            enqueueSnackbar(`Session started. Code: ${s.code}`, { variant: 'success' });
+                                                        }}
                                                     >
                                                         Start Session
                                                     </Button>
@@ -382,15 +373,28 @@ console.log('fullSession:', fullSession);
                                                     >
                                                         Share
                                                     </Button>
-                                                    {session?.code &&
-                                                    (<Button
-                                                        variant="contained"
-                                                        startIcon={<PlayArrowIcon />}
-                                                        onClick={() => enterWaiting(session.roomId)}>   
-                                                        Go To Host Room                                                    
-                                                    </Button>)                                                 
-                                                    }
-
+                                                    <Button
+                                                        variant="outlined"
+                                                        startIcon={<EditIcon />}
+                                                        onClick={() => handleEdit(quiz)}
+                                                    >
+                                                        Edit
+                                                    </Button>
+                                                    <Button
+                                                        variant="outlined"
+                                                        startIcon={<ContentCopyAllIcon />}
+                                                        onClick={() => handleDuplicate(quiz)}
+                                                    >
+                                                        Copy Quiz
+                                                    </Button>
+                                                    <Button
+                                                        color="error"
+                                                        variant="outlined"
+                                                        startIcon={<DeleteIcon />}
+                                                        onClick={() => handleDelete(quiz)}
+                                                    >
+                                                        Delete Quiz
+                                                    </Button>
                                                 </Stack>
 
                                                 {session?.code ? (
@@ -403,13 +407,9 @@ console.log('fullSession:', fullSession);
 
                                                                 <Typography
                                                                     variant="h4"
-                                                                    sx={{
-                                                                        fontWeight: 800,
-                                                                        letterSpacing: 2,
-                                                                        wordBreak: 'break-all'
-                                                                    }}
+                                                                    sx={{ fontWeight: 800, letterSpacing: 2, wordBreak: 'break-all' }}
                                                                 >
-                                                                    {session.pin ?? session.code}
+                                                                    {session.code}
                                                                 </Typography>
 
                                                                 <Typography variant="body2" color="text.secondary">

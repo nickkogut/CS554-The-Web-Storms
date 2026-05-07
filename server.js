@@ -153,6 +153,7 @@ function getRoomSnapshot(room){
   return{
     roomId: room.roomId,
     pin: room.pin,
+    quizName: room.quizName,
     hostName: room.hostName,
     status: room.status,
     currentQuestionIndex: room.currentQuestionIndex,
@@ -359,7 +360,7 @@ io.on('connection', (socket) => {
       else{
       const requestedCount = Number(payload?.questionCount || DEFAULT_QUESTION_COUNT);
       const questionCount = Number.isInteger(requestedCount) && requestedCount > 0 ? requestedCount : DEFAULT_QUESTION_COUNT;
-      const questions = await getRecentQuestions(questionCount);
+      questions = await getRecentQuestions(questionCount);
       }
       
       if(!questions.length){
@@ -460,6 +461,7 @@ io.on('connection', (socket) => {
       
       callback?.({
         ok: true,
+        quizName: room.quizName,
         roomId: room.roomId,
         playerId,
         pin: room.pin,
@@ -532,7 +534,6 @@ io.on('connection', (socket) => {
       startQuestion(io, room);
 
       // Update player statuses
-      console.log(room.players, "PLAYERS")
       room.players.forEach(async (player) => {
         if (player.uid && userStatusMap[player.uid]) {
           changeStatus(player.uid, "busy");
@@ -542,13 +543,9 @@ io.on('connection', (socket) => {
           // This will update next time the player refreshes/rejoins the server
           const user = await getUser(player.uid);
           const friends = user?.friends;
-          console.log(user, "USER")
-          console.log(friends, "FRIENDS")
           if (!friends) return;
           room.players.forEach(async (player2) => {
-            console.log("checking p2uid, ", player2.uid)
             if (player2.uid && friends.find((f) => f._id === player2.uid)) {
-              console.log("found, should update", player.uid, player2.uid)
               await updateLastInteracted(player.uid, player2.uid);
             }
           });
