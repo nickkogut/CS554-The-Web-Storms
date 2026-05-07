@@ -5,6 +5,7 @@ import { gameSocket } from "../socket";
 import userAPI from "./users/userAPI";
 import "./waitingRoom.css";
 import { useRef } from "react";
+import { Alert } from "@mui/material"
 
 function formatTime(seconds) {
   const s = Math.max(0, Math.floor(seconds));
@@ -128,6 +129,10 @@ export default function WaitingRoom({
         </Box>
       </Box>
     );
+  }
+
+  if (displayed.joinedCount == 0) {
+    return <Alert severity="error">Error: Room not found.</Alert>
   }
 
   return (
