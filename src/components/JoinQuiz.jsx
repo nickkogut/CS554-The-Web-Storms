@@ -1,75 +1,82 @@
 import { Box, Button, Stack, TextField, Alert } from "@mui/material";
-
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useState, useContext, useEffect } from "react";
 import { gameSocket } from "../socket";
 import { AuthContext } from "../context/AuthContext";
 
-function JoinQuiz(){
+function JoinQuiz() {
     const navigate = useNavigate();
-    const {currentUser} = useContext(AuthContext);
+    const { currentUser } = useContext(AuthContext);
     const [name, setName] = useState(currentUser?.displayName || "");
     const [searchParams] = useSearchParams();
     const [pin, setPin] = useState(() => searchParams.get('pin') || "");
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
-    useEffect(()=>{
-        if(currentUser?.displayName){
+
+    useEffect(() => {
+        if (currentUser?.displayName) {
             setName(currentUser.displayName);
-        }
-        else{
+        } else {
             setName("");
         }
-    },[currentUser, loading]);
+    }, [currentUser, loading]);
 
     useEffect(() => {
         const incoming = searchParams.get('pin');
         if (incoming) setPin(incoming);
     }, [searchParams]);
 
-    
-    const handleEnter = (e)=>{
+    const handleEnter = (e) => {
         e.preventDefault();
-        if(!pin || !name) return;
+        if (!pin || !name) return;
 
         setError("");
         setLoading(true);
 
-        gameSocket.emit('join_room', {pin, name, uid: currentUser?.uid || null}, (response)=>{
+        gameSocket.emit('join_room', { pin, name, uid: currentUser?.uid || null }, (response) => {
             setLoading(false);
-            if(!response?.ok){
+
+            if (!response?.ok) {
                 setError(response?.error || "Could not join");
                 return;
             }
+
+            localStorage.setItem('quiz_playerId', response.playerId);
+            localStorage.setItem('quiz_roomId', response.roomId);
+            localStorage.setItem('quiz_pin', pin);
+            localStorage.setItem('quiz_playerName', name);
+
             navigate(`/play/${response.roomId}?playerId=${response.playerId}`);
         });
     };
 
-  return (
-    <Box sx={{ display: "flex", flexDirection: "column", height: "75vh", fontFamily: "Gill Sans, sans-serif" }}      
-        component="form"
-        onSubmit={handleEnter}>
-        <Stack spacing={2} alignItems="center" sx={{ margin: "auto", mt: 10 }}>
-            <TextField
-                autoFocus
-                label="Name"
-                variant="outlined"
-                value={name}
-                onChange={(e)=>setName(e.target.value)}
-            ></TextField>            
-            <TextField                
-                label="PIN"
-                variant="outlined"
-                value={pin}
-                onChange={(e)=>setPin(e.target.value)}
-            ></TextField>
-            {error && <Alert severity="error">{error}</Alert>}
-            <Button variant="contained" type="submit" disabled={!pin || !name || loading}>
-                {loading ? "Joining..." : "Join Quiz"}
+    return (
+        <Box
+            sx={{ display: "flex", flexDirection: "column", height: "75vh", fontFamily: "Gill Sans, sans-serif" }}
+            component="form"
+            onSubmit={handleEnter}
+        >
+            <Stack spacing={2} alignItems="center" sx={{ margin: "auto", mt: 10 }}>
+                <TextField
+                    autoFocus
+                    label="Name"
+                    variant="outlined"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                />
+                <TextField
+                    label="PIN"
+                    variant="outlined"
+                    value={pin}
+                    onChange={(e) => setPin(e.target.value)}
+                />
+                {error && <Alert severity="error">{error}</Alert>}
+                <Button variant="contained" type="submit" disabled={!pin || !name || loading}>
+                    {loading ? "Joining..." : "Join Quiz"}
                 </Button>
-        </Stack>
-    </Box>
-  );
+            </Stack>
+        </Box>
+    );
 }
 
 export default JoinQuiz;

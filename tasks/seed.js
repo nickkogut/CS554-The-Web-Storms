@@ -50,9 +50,9 @@ const quizBlueprints = [
         correctOptions: [0, 2, 3]
       },
       {
-        questionText: 'What is Thor’s hammer called?',
-        options: ['Mjolnir', 'Stormbreaker', 'Excalibur', 'Axe'],
-        correctOptions: [0]
+        questionText: 'What are the weapons of Thor',
+        options: ['Mjolnir', 'Stormbreaker', 'Excalibur', 'Leviathan Axe'],
+        correctOptions: [0,1]
       },
       {
         questionText: 'Black Panther rules which nation?',
