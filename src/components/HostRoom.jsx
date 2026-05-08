@@ -118,7 +118,7 @@ function HostRoom() {
 
 
 
-  function handleNextQuestion() {
+  function handleNextQuestion(isManuallySelected=true) {
     if (roomRef.current?.status !== "review" || roomRef.current?.currentQuestionIndex == roomRef.current?.totalQuestions) return; // canNext
     setError("");
     setActionLoading(true);
@@ -126,7 +126,8 @@ function HostRoom() {
     gameSocket.emit('next_question', { roomId }, (response) => {
       setActionLoading(false);
 
-      if(!response?.ok){
+      if(!response?.ok && isManuallySelected){
+        // ignore error if we tried to automatically load the next question but the status changed during the 8 second wait.
         setError(response?.error || "Could not load next question");
       }
     });
@@ -134,7 +135,7 @@ function HostRoom() {
 
     function delayedHandleNextQuestion() {
       setTimeout(() => {
-        if (autoNextRef.current) handleNextQuestion(); // If the user hasn't unchecked the box in the meantime, auto handle the next question
+        if (autoNextRef.current) handleNextQuestion(false); // If the user hasn't unchecked the box in the meantime, auto handle the next question
       }, 8000);
   }
 

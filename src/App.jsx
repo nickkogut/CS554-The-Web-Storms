@@ -17,9 +17,7 @@ import WaitingRoom from './components/WaitingRoom.jsx';
 import HostRoom from './components/HostRoom.jsx';
 import PlayerGame from './components/PlayerGame.jsx';
 import Player from './components/Player.jsx';
-
 import QuizCatalog from './components/QuizCatalog.jsx';
-import DEBUGfriends from './components/DEBUGfriends.jsx';
 
 function App() {
   return (
@@ -40,11 +38,9 @@ function App() {
         <Route path='/change-password' element={<ChangePassword />} />
 
         <Route path='/search-quizzes' element={<QuizCatalog />} />
-        <Route path='/waiting-demo' element={<WaitingRoomDemo />} />
+        {/* <Route path='/waiting-demo' element={<WaitingRoomDemo />} /> */}
         <Route path='/play/:roomId' element = {<PlayerGame/>}/>
         <Route path='/host-room/:roomId' element={<HostRoom/>}/>
-
-        <Route path='/test-friends' element={<DEBUGfriends/>} />
 
         <Route path='/player/:id' element={<Player/>}/>
 
