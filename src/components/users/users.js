@@ -1,7 +1,7 @@
-import {users} from '../../../config/mongoCollections.js';
+import {users, games} from '../../../config/mongoCollections.js';
 
 
-export const createUser = async (uid, displayName) => {
+export const createUser = async (uid, displayName, email) => {
     const usersCollection = await users();
     const existingUser = await usersCollection.findOne({_id: uid})
     if (existingUser) return existingUser;
@@ -9,6 +9,7 @@ export const createUser = async (uid, displayName) => {
     const newUser = {
         _id: uid,
         name: displayName,
+        email: email,
         friends: [],
         quiz_history: []
     }
@@ -17,15 +18,22 @@ export const createUser = async (uid, displayName) => {
     const addedUser = await usersCollection.insertOne(newUser);
     if (!addedUser) throw "Error: failed to add new user";
 
-    return addedUser;
+    return newUser;
 }
 
 export const getUser = async (_id) => {
     const usersCollection = await users();
     const user = await usersCollection.findOne({_id})
-    if (user) return user;
-    else throw "Error: could not find user";
+    return user; // May be empty. The caller would rather check if this is empty than handle an error.
 
+}
+
+export const getGames = async (playerUid) => {
+    const gamesCollection = await games();
+    const gamesList = await gamesCollection.find({
+        'leaderboard.uid': playerUid
+    }).toArray();
+    return gamesList;
 }
 
 export const addQuizToHistory = async (currId, quizResult) => {

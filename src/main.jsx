@@ -7,11 +7,8 @@ import Slide from '@mui/material/Slide';
 import './index.css'
 import App from './App'
 
-import fbconfig from './firebase/FirebaseConfig';
-import { initializeApp } from "firebase/app";
 import { AuthProvider } from './context/AuthContext';
 import Navbar from './components/Navbar';
-const app = initializeApp(fbconfig);
 
 function SlideTransition(props) {
   return <Slide {...props} direction="up" />;

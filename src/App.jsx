@@ -1,5 +1,5 @@
 import React from 'react';
-import { Route, Routes } from 'react-router-dom';
+import { Route, Routes, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import PrivateRoute from './components/auth/PrivateRoute';
 import Login from './components/auth/Login';
@@ -15,34 +15,44 @@ import HostRoom from './components/HostRoom.jsx';
 import PlayerRoom from './components/PlayerRoom.jsx';
 import Mailbox from './components/Mailbox.jsx';
 import WaitingRoomDemo from './components/WaitingRoomDemo';
+import WaitingRoom from './components/WaitingRoom.jsx';
+import HostRoom from './components/HostRoom.jsx';
+import PlayerGame from './components/PlayerGame.jsx';
+import Player from './components/Player.jsx';
 
 import QuizCatalog from './components/QuizCatalog.jsx';
+import DEBUGfriends from './components/DEBUGfriends.jsx';
 
 function App() {
   return (
     <AuthProvider>
       <Routes>
+        <Route path='/' element={<Dashboard />} />
         <Route path='/create-quiz' element={<ModeratorPage />} />
         <Route path='/login' element={<Login />} />
         <Route path='/signup' element={<SignUp />} />
 
         <Route path='/leaderboard' element={<Leaderboard />} />
 
-        <Route path='/' element={<Dashboard />} />
+        
         <Route path='/join' element={<JoinQuiz />} />
         <Route path='/host' element={<HostQuiz />} />
         <Route path='/host-room/:roomId' element={<HostRoom />} />
         <Route path='/play-room/:roomId' element={<PlayerRoom />} />
 
-        <Route path='/logout' element={<LogOut />} /> {/* Temporary - This will just be accessed as a button on other pages */}
-
         <Route path='/change-password' element={<PrivateRoute />} />
         <Route path='/change-password' element={<ChangePassword />} />
 
-        <Route path='/my-quizzes' element={<QuizCatalog />} />
+        <Route path='/search-quizzes' element={<QuizCatalog />} />
         <Route path='/waiting-demo' element={<WaitingRoomDemo />} />
+        <Route path='/play/:roomId' element = {<PlayerGame/>}/>
+        <Route path='/host-room/:roomId' element={<HostRoom/>}/>
 
-          <Route path='/test-mailbox' element={<Mailbox/>} />
+        <Route path='/test-friends' element={<DEBUGfriends/>} />
+
+        <Route path='/player/:id' element={<Player/>}/>
+
+      <Route path="*" element={<Navigate to="/" replace={true} />} />
 
       </Routes>
     </AuthProvider>

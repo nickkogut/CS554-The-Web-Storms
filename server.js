@@ -2,14 +2,18 @@ import { ApolloServer } from '@apollo/server';
 import { startStandaloneServer } from '@apollo/server/standalone';
 import { Server } from 'socket.io';
 import crypto from 'crypto';
-import {createServer} from 'http';
+import { createServer } from 'http';
 import { ObjectId } from 'mongodb';
 
 import { typeDefs } from './typeDefs.js';
 import { resolvers } from './resolvers.js';
 import { connectRedis } from './config/redisClient.js';
 import { questions as questionCollection, quizzes as quizCollection } from './config/mongoCollections.js';
+import { games } from './config/mongoCollections.js';
 import admin from './src/firebase/FirebaseAdmin.js';
+import { getUser } from './src/components/users/users.js';
+import { createFriendRequest, updateLastInteracted } from './src/components/users/friendRequests.js';
+import { connectRabbitMQ, publish, QUEUES } from './config/rabbitmq.js';
 
 const GRAPHQL_PORT = Number(process.env.PORT) || 4000;
 const SOCKET_PORT = Number(process.env.SOCKET_PORT) || 4001;
@@ -20,15 +24,85 @@ const rooms = new Map();
 const pinToRoomId = new Map();
 const socketMeta = new Map();
 
+const userStatusMap = new Map();
+const disconnectingUsers = {};
+
+const notifyFriends = async (uid, status) => {
+  const user = await getUser(uid);
+  if (!user) return;
+  const friends = user.friends.map((friend) => friend._id);
+  friends.forEach((friendId) => {
+    if (userStatusMap[friendId]) {
+      io.to(friendId).emit('friendsUpdate', { uid, status });
+    }
+  });
+};
+
+const initStatuses = (uid, friend_ids) => {
+  const statuses = {};
+  if (!friend_ids) return;
+  friend_ids.forEach((friend) => {
+    if (userStatusMap[friend]) {
+      statuses[friend] = userStatusMap[friend];
+    }
+  });
+  io.to(uid).emit('initStatuses', statuses);
+};
+
+const changeStatus = async (uid, newStatus) => {
+  if (disconnectingUsers[uid]) {
+    clearTimeout(disconnectingUsers[uid]);
+    delete disconnectingUsers[uid];
+  }
+
+  if (newStatus?.fromLoad) {
+    if (userStatusMap[uid]) return;
+  }
+
+  let status;
+
+  switch (newStatus) {
+    case 'online':
+      status = { status: 'online' };
+      const alreadyOnline = (uid in userStatusMap);
+      userStatusMap[uid] = status;
+      if (!alreadyOnline) {
+        notifyFriends(uid, status);
+      }
+      break;
+
+    case 'offline':
+      status = { status: 'offline' };
+      disconnectingUsers[uid] = setTimeout(() => {
+        const wasDeleted = delete userStatusMap[uid];
+        if (wasDeleted) {
+          notifyFriends(uid, status);
+        }
+      }, 2000);
+      break;
+
+    case 'busy':
+      status = { status: 'busy' };
+      userStatusMap[uid] = status;
+      notifyFriends(uid, status);
+      break;
+
+    default:
+      status = { status: 'in-lobby', roomId: newStatus };
+      userStatusMap[uid] = status;
+      notifyFriends(uid, status);
+  }
+};
+
 function createRoomId() {
   return crypto.randomUUID();
 }
 
-function createPin(){
+function createPin() {
   let pin = '';
-  do{
+  do {
     pin = String(Math.floor(100000 + Math.random() * 900000));
-  } while(pinToRoomId.has(pin));
+  } while (pinToRoomId.has(pin));
   return pin;
 }
 
@@ -46,38 +120,76 @@ function acquirePin(requestedCode){
   return trimmed;
 }
 
-function ensureString(value, fieldName){
-  if(typeof value !== 'string'){
+function ensureString(value, fieldName) {
+  if (typeof value !== 'string') {
     throw new Error(`${fieldName} must be a string`);
   }
   value = value.trim();
-  if(!value){
+  if (!value) {
     throw new Error(`${fieldName} cannot be empty`);
   }
   return value;
 }
 
-function sortPlayers(playersMap){
-  return Array.from(playersMap.values()).sort((a,b) =>{
-    if(b.score !== a.score)
-      return b.score - a.score;
+function normalizeIntList(values) {
+  return Array.from(
+    new Set(
+      (values || [])
+        .map((value) => Number(value))
+        .filter((value) => Number.isInteger(value) && value >= 0 && value <= 3)
+    )
+  ).sort((a, b) => a - b);
+}
+
+function extractCorrectOptions(question) {
+  if (Array.isArray(question?.correctOptions) && question.correctOptions.length > 0) {
+    return normalizeIntList(question.correctOptions);
+  }
+
+  if (Number.isInteger(question?.correctOption)) {
+    return [question.correctOption];
+  }
+
+  return [];
+}
+
+function extractSelectedOptions(payload) {
+  if (Array.isArray(payload?.selectedOptions) && payload.selectedOptions.length > 0) {
+    return normalizeIntList(payload.selectedOptions);
+  }
+
+  if (Number.isInteger(payload?.selectedOption)) {
+    return [Number(payload.selectedOption)];
+  }
+
+  return [];
+}
+
+function selectionsEqual(left, right) {
+  if (left.length !== right.length) return false;
+  return left.every((value, index) => value === right[index]);
+}
+
+function sortPlayers(playersMap) {
+  return Array.from(playersMap.values()).sort((a, b) => {
+    if (b.score !== a.score) return b.score - a.score;
     return a.joinedAt - b.joinedAt;
   });
 }
 
-function getRoomByPin(pin){
+function getRoomByPin(pin) {
   const roomId = pinToRoomId.get(pin);
-  if(!roomId)
-    return null;
+  if (!roomId) return null;
   return rooms.get(roomId) || null;
 }
 
-function getPublicPlayers(room){
+function getPublicPlayers(room) {
   return sortPlayers(room.players).map((player, index) => {
-    return{
-      rank: index+1,
+    return {
+      rank: index + 1,
       playerId: player.playerId,
       name: player.name,
+      uid: player.uid || null,
       score: player.score,
       connected: player.connected,
       answeredCurrentQuestion: room.status === 'question' ? room.answers.has(player.playerId) : false
@@ -85,10 +197,11 @@ function getPublicPlayers(room){
   });
 }
 
-function getRoomSnapshot(room){
-  return{
+function getRoomSnapshot(room) {
+  return {
     roomId: room.roomId,
     pin: room.pin,
+    quizName: room.quizName,
     hostName: room.hostName,
     status: room.status,
     currentQuestionIndex: room.currentQuestionIndex,
@@ -100,38 +213,42 @@ function getRoomSnapshot(room){
   };
 }
 
-function emitRoomSnapshot(io, room){
+function emitRoomSnapshot(io, room) {
   io.to(room.roomId).emit('room_snapshot', getRoomSnapshot(room));
 }
 
-function storeSocketMeta(socketId, meta){
+function storeSocketMeta(socketId, meta) {
   socketMeta.set(socketId, meta);
 }
 
-function clearSocketMeta(socketId){
+function clearSocketMeta(socketId) {
   socketMeta.delete(socketId);
 }
 
-function clearRoomTimer(room){
-  if(room.timer){
+function clearRoomTimer(room) {
+  if (room.timer) {
     clearTimeout(room.timer);
     room.timer = null;
   }
 }
 
-async function getRecentQuestions(limit = DEFAULT_QUESTION_COUNT){
+async function getRecentQuestions(limit = DEFAULT_QUESTION_COUNT) {
   const col = await questionCollection();
   const docs = await col
     .find({})
     .sort({ createdAt: -1 })
     .limit(limit)
     .toArray();
+
   return docs.map((doc) => {
     return {
       _id: doc._id.toString(),
       questionText: doc.questionText,
       options: doc.options,
       correctOption: doc.correctOption,
+      correctOptions: Array.isArray(doc.correctOptions)
+        ? doc.correctOptions
+        : (Number.isInteger(doc.correctOption) ? [doc.correctOption] : []),
       createdAt: doc.createdAt
     };
   });
@@ -162,7 +279,7 @@ async function getQuestionsForQuiz(quizId){
   });
 }
 
-function finishQuiz(io, room){
+async function finishQuiz(io, room) {
   clearRoomTimer(room);
   room.status = 'finished';
   room.questionEndsAt = null;
@@ -172,71 +289,132 @@ function finishQuiz(io, room){
     pin: room.pin,
     leaderboard: finalLeaderboard
   });
+
+  const payload = {
+    roomId: room.roomId,
+    quizName: room.quizName,
+    pin: room.pin,
+    totalQuestions: room.questions.length,
+    numPlayers: finalLeaderboard.length,
+    leaderboard: finalLeaderboard,
+    players: room.players,
+    finishedAt: new Date().toISOString()
+  };
+
+  try {
+    const gameCollection = await games();
+    await gameCollection.insertOne(payload);
+    console.log("Saved to completedQuizzes");
+  } catch (err) {
+    console.error("Mongo save failed:", err);
+  }
+
+
+  publish(QUEUES.QUIZ_RESULT, {
+    roomId: room.roomId,
+    quizName: room.quizName,
+    pin: room.pin,
+    totalQuestions: room.questions.length,
+    numPlayers: finalLeaderboard.length,
+    leaderboard: finalLeaderboard,
+    finishedAt: new Date().toISOString()
+  });
+
   emitRoomSnapshot(io, room);
+
+  room.players.forEach((player) => {
+    if (player.uid && userStatusMap[player.uid]) {
+      changeStatus(player.uid, 'online');
+    }
+  });
 }
 
-function closeQuestion(io, roomId){
+function closeQuestion(io, roomId) {
   const room = rooms.get(roomId);
-  if(!room)
-    return;
-  if(room.status !== 'question')
-    return;
+  if (!room) return;
+  if (room.status !== 'question') return;
+
   clearRoomTimer(room);
   const question = room.questions[room.currentQuestionIndex];
+  const correctOptions = extractCorrectOptions(question);
   const answerStats = [0, 0, 0, 0];
   const playerResults = [];
-  for
-  (const player of room.players.values()){
+
+  for (const player of room.players.values()) {
     const submitted = room.answers.get(player.playerId) || null;
+    const selectedOptions = submitted ? extractSelectedOptions(submitted) : [];
     let isCorrect = false;
-    if(submitted){
-      answerStats[submitted.selectedOption] += 1;
-      isCorrect = submitted.selectedOption === question.correctOption;
+
+    if (submitted) {
+      selectedOptions.forEach((opt) => {
+        if (opt >= 0 && opt <= 3) {
+          answerStats[opt] += 1;
+        }
+      });
+
+      isCorrect = selectionsEqual(selectedOptions, correctOptions);
     }
-    if(isCorrect){
-      player.score += 100;
+
+    let tempScore = 0;
+
+    if (isCorrect) {
+      const time_dif = room.questionEndsAt - submitted.submittedAt;
+      const time_score = time_dif / QUESTION_TIME_LIMIT_MS;
+      tempScore = Math.round(100 + (900 * time_score));
     }
+
+    player.score += tempScore;
+
     playerResults.push({
       playerId: player.playerId,
       name: player.name,
-      selectedOption: submitted ? submitted.selectedOption : null,
+      selectedOption: selectedOptions[0] ?? null,
+      selectedOptions,
       isCorrect,
       score: player.score
     });
   }
+
   room.latestQuestionResult = {
     questionIndex: room.currentQuestionIndex,
-    correctOption: question.correctOption,
+    correctOption: correctOptions[0] ?? null,
+    correctOptions,
     answerStats,
     players: playerResults
   };
+
   room.status = 'review';
   room.questionEndsAt = null;
+
   io.to(room.roomId).emit('question_closed', {
     questionIndex: room.currentQuestionIndex,
-    correctOption: question.correctOption,
+    correctOption: correctOptions[0] ?? null,
+    correctOptions,
     answerStats,
     players: getPublicPlayers(room)
   });
+
   emitRoomSnapshot(io, room);
-  if(room.currentQuestionIndex === room.questions.length - 1){
+
+  if (room.currentQuestionIndex === room.questions.length - 1) {
     finishQuiz(io, room);
   }
 }
 
-function startQuestion(io, room){
-  if(!room)
-    return;
-  if(room.currentQuestionIndex + 1 >= room.questions.length){
+function startQuestion(io, room) {
+  if (!room) return;
+  if (room.currentQuestionIndex + 1 >= room.questions.length) {
     finishQuiz(io, room);
     return;
   }
+
   clearRoomTimer(room);
   room.currentQuestionIndex += 1;
   room.status = 'question';
   room.answers = new Map();
   room.latestQuestionResult = null;
   room.questionEndsAt = Date.now() + QUESTION_TIME_LIMIT_MS;
+
   const question = room.questions[room.currentQuestionIndex];
   io.to(room.roomId).emit('question_started', {
     questionIndex: room.currentQuestionIndex,
@@ -245,18 +423,21 @@ function startQuestion(io, room){
     options: question.options,
     endsAt: room.questionEndsAt
   });
+
   emitRoomSnapshot(io, room);
+
   room.timer = setTimeout(() => {
     closeQuestion(io, room.roomId);
   }, QUESTION_TIME_LIMIT_MS);
 }
 
 await connectRedis();
+await connectRabbitMQ();
 
 const apolloServer = new ApolloServer({ typeDefs, resolvers });
 
 const httpServer = createServer();
-const io = new Server(httpServer, {cors: {origin: '*'}});
+const io = new Server(httpServer, { cors: { origin: '*' } });
 httpServer.listen(SOCKET_PORT, () => {
   console.log(`🚀 Socket.io ready on port ${SOCKET_PORT}`);
 });
@@ -264,13 +445,13 @@ httpServer.listen(SOCKET_PORT, () => {
 const { url } = await startStandaloneServer(apolloServer, {
   listen: { port: 4000 },
   context: async ({ req, res }) => {
-    const authHeader = req.headers.authorization || "";
+    const authHeader = req.headers.authorization || '';
 
-    if (!authHeader.startsWith("Bearer ")) {
+    if (!authHeader.startsWith('Bearer ')) {
       return { user: null };
     }
 
-    const token = authHeader.split(" ")[1];
+    const token = authHeader.split(' ')[1];
 
     try {
       const decoded = await admin.auth().verifyIdToken(token);
@@ -284,6 +465,82 @@ console.log(`🚀 GraphQL ready at: ${url}`);
 
 io.on('connection', (socket) => {
   socket.on('create_room', async (payload, callback) => {
+  try {
+    const hostName = ensureString(payload?.hostName || 'Host', 'Host name');
+
+    const quizName =
+      typeof payload?.quizName === 'string' && payload.quizName.trim()
+        ? payload.quizName.trim()
+        : 'Untitled Quiz';
+
+    let questions = [];
+
+    // MUST use frontend passed questions first
+    if (Array.isArray(payload?.questions) && payload.questions.length > 0) {
+      questions = payload.questions.map((q) => ({
+        _id: q._id || crypto.randomUUID(),
+        questionText: q.questionText || '',
+        options: Array.isArray(q.options) ? q.options : [],
+        correctOption:
+          Number.isInteger(q.correctOption)
+            ? q.correctOption
+            : null,
+        correctOptions: Array.isArray(q.correctOptions)
+          ? q.correctOptions
+          : Number.isInteger(q.correctOption)
+          ? [q.correctOption]
+          : []
+      }));
+    } else {
+      questions = await getRecentQuestions(DEFAULT_QUESTION_COUNT);
+    }
+
+    if (!questions.length) {
+      throw new Error('No questions found.');
+    }
+
+    const pin = createPin();
+    const roomId = pin;
+
+    const room = {
+      roomId,
+      pin,
+      quizName,
+      hostSocketId: socket.id,
+      hostName,
+      status: 'lobby',
+      questions,
+      currentQuestionIndex: -1,
+      questionEndsAt: null,
+      latestQuestionResult: null,
+      answers: new Map(),
+      players: new Map(),
+      timer: null
+    };
+
+    rooms.set(roomId, room);
+    pinToRoomId.set(pin, roomId);
+
+    socket.join(roomId);
+    storeSocketMeta(socket.id, { roomId, role: 'host' });
+
+    emitRoomSnapshot(io, room);
+
+    callback?.({
+      ok: true,
+      roomId,
+      pin,
+      totalQuestions: questions.length
+    });
+
+  } catch (e) {
+    callback?.({
+      ok: false,
+      error: e.message || 'Unable to create room'
+    });
+  }
+});
+
     try{
       const hostName = ensureString(payload?.hostName || 'Host', 'Host name');
       const requestedCount = Number(payload?.questionCount || DEFAULT_QUESTION_COUNT);
@@ -337,10 +594,10 @@ io.on('connection', (socket) => {
   });
   
   socket.on('watch_room', (payload, callback) => {
-    try{
+    try {
       const roomId = ensureString(payload?.roomId, 'Room ID');
       const room = rooms.get(roomId);
-      if(!room){
+      if (!room) {
         throw new Error('Room not found');
       }
       room.hostSocketId = socket.id;
@@ -351,67 +608,118 @@ io.on('connection', (socket) => {
         ok: true,
         room: getRoomSnapshot(room)
       });
-    }
-    catch(e){
+    } catch (e) {
       callback?.({
         ok: false,
         error: e.message || 'Unable to watch room'
       });
     }
   });
-  
+
   socket.on('join_room', (payload, callback) => {
-    try{
+    try {
       const pin = ensureString(payload?.pin, 'PIN');
       const name = ensureString(payload?.name, 'Player name');
+      const requestedPlayerId = payload?.playerId || null;
       const room = getRoomByPin(pin);
-      if(!room){
+
+      if (!room) {
         throw new Error('Room not found for that PIN');
       }
-      if(room.status === 'finished'){
+      if (room.status === 'finished') {
         throw new Error('This quiz has already finished');
       }
-      const playerId = createRoomId();
+
+      const normalizedName = name.trim().toLowerCase();
+      const existingPlayer = Array.from(room.players.values()).find((player) => {
+        const sameUid = payload?.uid && player.uid && player.uid === payload.uid;
+        const sameName = (player.name || '').trim().toLowerCase() === normalizedName;
+        return sameUid || sameName;
+      });
+
+      if (existingPlayer) {
+        existingPlayer.name = name;
+        existingPlayer.uid = payload?.uid || existingPlayer.uid || null;
+        existingPlayer.connected = true;
+        existingPlayer.socketId = socket.id;
+
+        socket.join(room.roomId);
+        storeSocketMeta(socket.id, {
+          roomId: room.roomId,
+          role: 'player',
+          playerId: existingPlayer.playerId
+        });
+
+        emitRoomSnapshot(io, room);
+
+        callback?.({
+          ok: true,
+          quizName: room.quizName,
+          roomId: room.roomId,
+          playerId: existingPlayer.playerId,
+          pin: room.pin,
+          room: getRoomSnapshot(room)
+        });
+
+        const storedPlayer = room.players.get(existingPlayer.playerId);
+        if (storedPlayer?.uid && userStatusMap[storedPlayer.uid]) {
+          changeStatus(storedPlayer.uid, room.pin);
+          io.to(storedPlayer.uid).emit('updateLobbyStatus', { canInvite: true });
+        }
+
+        return;
+      }
+
+      const playerId = requestedPlayerId || createRoomId();
+
       room.players.set(playerId, {
         playerId,
         name,
+        uid: payload?.uid || null,
         score: 0,
         connected: true,
         socketId: socket.id,
         joinedAt: Date.now()
       });
+
       socket.join(room.roomId);
       storeSocketMeta(socket.id, {
         roomId: room.roomId,
         role: 'player',
         playerId
       });
-      
+
       emitRoomSnapshot(io, room);
-      
+
       callback?.({
         ok: true,
+        quizName: room.quizName,
         roomId: room.roomId,
         playerId,
         pin: room.pin,
         room: getRoomSnapshot(room)
       });
-    }
-    catch(e){
-      callback?.({ ok: false, error: e.message || 'Unable to join room'});
+
+      const storedPlayer = room.players.get(playerId);
+      if (storedPlayer?.uid && userStatusMap[storedPlayer.uid]) {
+        changeStatus(storedPlayer.uid, room.pin);
+        io.to(storedPlayer.uid).emit('updateLobbyStatus', { canInvite: true });
+      }
+    } catch (e) {
+      callback?.({ ok: false, error: e.message || 'Unable to join room' });
     }
   });
-  
+
   socket.on('player_reconnect', (payload, callback) => {
-    try{
+    try {
       const roomId = ensureString(payload?.roomId, 'Room ID');
       const playerId = ensureString(payload?.playerId, 'Player ID');
       const room = rooms.get(roomId);
-      if(!room){
+      if (!room) {
         throw new Error('Room not found');
       }
       const player = room.players.get(playerId);
-      if(!player){
+      if (!player) {
         throw new Error('Player not found');
       }
       player.connected = true;
@@ -419,7 +727,7 @@ io.on('connection', (socket) => {
       socket.join(room.roomId);
       storeSocketMeta(socket.id, { roomId, role: 'player', playerId });
       emitRoomSnapshot(io, room);
-      if(room.status === 'question' && room.currentQuestionIndex >= 0){
+      if (room.status === 'question' && room.currentQuestionIndex >= 0) {
         const question = room.questions[room.currentQuestionIndex];
         socket.emit('question_started', {
           questionIndex: room.currentQuestionIndex,
@@ -433,113 +741,185 @@ io.on('connection', (socket) => {
         ok: true,
         room: getRoomSnapshot(room)
       });
-    }
-    catch(e){
+    } catch (e) {
       callback?.({
         ok: false,
         error: e.message || 'Unable to reconnect player'
       });
     }
   });
-  socket.on('start_quiz', (payload, callback) => {
-    try{
+
+  socket.on('start_quiz', async (payload, callback) => {
+    try {
       const roomId = ensureString(payload?.roomId, 'Room ID');
       const room = rooms.get(roomId);
-      if(!room){
+      if (!room) {
         throw new Error('Room not found');
       }
-      if(room.status !== 'lobby'){
+      if (room.status !== 'lobby') {
         throw new Error('Quiz can only be started from the lobby');
       }
-      if(room.players.size === 0){
+      if (room.players.size === 0) {
         throw new Error('At least one player must join before starting');
       }
       startQuestion(io, room);
+
+      room.players.forEach(async (player) => {
+        if (player.uid && userStatusMap[player.uid]) {
+          changeStatus(player.uid, 'busy');
+          io.to(player.uid).emit('updateLobbyStatus', { canInvite: false });
+
+          const user = await getUser(player.uid);
+          const friends = user?.friends;
+          if (!friends) return;
+          room.players.forEach(async (player2) => {
+            if (player2.uid && friends.find((f) => f._id === player2.uid)) {
+              await updateLastInteracted(player.uid, player2.uid);
+            }
+          });
+        }
+      });
+
       callback?.({ ok: true });
-    }
-    catch(e){
+    } catch (e) {
       callback?.({ ok: false, error: e.message || 'Unable to start quiz' });
     }
   });
+
   socket.on('submit_answer', (payload, callback) => {
-    try{
+    try {
       const roomId = ensureString(payload?.roomId, 'Room ID');
       const playerId = ensureString(payload?.playerId, 'Player ID');
       const questionIndex = Number(payload?.questionIndex);
-      const selectedOption = Number(payload?.selectedOption);
+      const selectedOptions = extractSelectedOptions(payload);
       const room = rooms.get(roomId);
-      if(!room){
+      if (!room) {
         throw new Error('Room not found');
       }
-      if(room.status !== 'question'){
+      if (room.status !== 'question') {
         throw new Error('There is no active question right now');
       }
-      if(room.currentQuestionIndex !== questionIndex){
+      if (room.currentQuestionIndex !== questionIndex) {
         throw new Error('That question is no longer active');
       }
-      if(!room.players.has(playerId)){
+      if (!room.players.has(playerId)) {
         throw new Error('Player not found');
       }
-      if(!Number.isInteger(selectedOption) || selectedOption < 0 || selectedOption > 3){
+      if (!selectedOptions.length) {
         throw new Error('Selected option is invalid');
       }
-      if(room.answers.has(playerId)){
+      if (room.answers.has(playerId)) {
         throw new Error('Answer already submitted');
       }
       room.answers.set(playerId, {
-        selectedOption,
+        selectedOptions,
         submittedAt: Date.now()
       });
       emitRoomSnapshot(io, room);
       const connectedPlayers = Array.from(room.players.values()).filter((player) => {
         return player.connected;
       });
-      const allConnectedPlayersAnswered = connectedPlayers.length > 0 && connectedPlayers.every((player) => room.answers.has(player.playerId));
-      if(allConnectedPlayersAnswered){
+      const allConnectedPlayersAnswered =
+        connectedPlayers.length > 0 &&
+        connectedPlayers.every((player) => room.answers.has(player.playerId));
+      if (allConnectedPlayersAnswered) {
         closeQuestion(io, roomId);
       }
       callback?.({ ok: true });
-    }
-    catch(e){
+    } catch (e) {
       callback?.({ ok: false, error: e.message || 'Unable to submit answer' });
     }
   });
+
   socket.on('next_question', (payload, callback) => {
-    try{
+    try {
       const roomId = ensureString(payload?.roomId, 'Room ID');
       const room = rooms.get(roomId);
-      if(!room){
+      if (!room) {
         throw new Error('Room not found');
       }
-      if(room.status === 'finished'){
+      if (room.status === 'finished') {
         throw new Error('Quiz has already finished');
       }
-      if(room.status !== 'review'){
+      if (room.status !== 'review') {
         throw new Error('Next question can only start after current question closes');
       }
-      startQuestion(io, room); callback?.({ ok: true });
-    }
-    catch(e){
+      startQuestion(io, room);
+      callback?.({ ok: true });
+    } catch (e) {
       callback?.({ ok: false, error: e.message || 'Unable to move to next question' });
     }
   });
+
+  socket.on('joinPersonalRoom', ({ uid }) => {
+    socket.join(uid);
+  });
+
+  socket.on('leavePersonalRoom', ({ uid }) => {
+    socket.leave(uid);
+  });
+
+  socket.on('changeStatus', async (data) => {
+    const uid = data.uid;
+    const newStatus = data.status;
+    await changeStatus(uid, newStatus);
+  });
+
+  socket.on('initStatuses', ({ uid, friend_ids }) => {
+    initStatuses(uid, friend_ids);
+  });
+
+  socket.on('sendFriendRequest', async ({ uid, friendId }) => {
+    try {
+      const req = await createFriendRequest(uid, friendId);
+      if (req) {
+        const sender = await getUser(uid);
+        if (sender?.friends && sender.friends.find((f) => f._id === friendId)) {
+          const senderStatus = userStatusMap[uid] || { status: 'offline' };
+          const recipStatus = userStatusMap[friendId] || { status: 'offline' };
+
+          io.to(uid).emit('friendsListUpdate', { friendId, status: recipStatus, friended: true });
+          io.to(friendId).emit('friendsListUpdate', { friendId: uid, status: senderStatus, friended: true });
+        } else {
+          io.to(friendId).emit('friendRequest', { id: uid });
+        }
+      }
+    } catch (e) {
+      return;
+    }
+  });
+
+  socket.on('inviteToLobby', async ({ uid, friendId }) => {
+    const status = userStatusMap[uid] || {};
+    const roomId = status.roomId || null;
+    io.to(friendId).emit('lobbyInvite', { id: uid, roomId });
+  });
+
+  socket.on('acceptFriendRequest', async ({ fromId, toId }) => {
+    let status = userStatusMap[fromId] || { status: 'offline' };
+    io.to(toId).emit('friendsListUpdate', { friendId: fromId, status, friended: true });
+  });
+
+  socket.on('unfriend', async ({ fromId, toId }) => {
+    io.to(toId).emit('friendsListUpdate', { friendId: fromId, friended: false });
+  });
+
   socket.on('disconnect', () => {
     const meta = socketMeta.get(socket.id);
     clearSocketMeta(socket.id);
-    if(!meta)
-      return;
+    if (!meta) return;
     const room = rooms.get(meta.roomId);
-    if(!room)
-      return;
-    if(meta.role === 'host'){
+    if (!room) return;
+    if (meta.role === 'host') {
       room.hostSocketId = null;
     }
-    if(meta.role === 'player'){
+    if (meta.role === 'player') {
       const player = room.players.get(meta.playerId);
-      if(player){
+      if (player) {
         player.connected = false;
       }
     }
+
     emitRoomSnapshot(io, room);
   });
 });

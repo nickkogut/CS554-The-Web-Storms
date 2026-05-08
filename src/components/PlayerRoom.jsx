@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { gameSocket } from "../../socket.js";
+import { gameSocket } from "../socket.js";
 import { TableBody, TableCell, TableContainer, TableHead, TableRow, Typography, Box, Alert, Button, Table, Paper } from "@mui/material";
+import { auth } from "../firebase/FirebaseConfig";
+import userAPI from "./users/userAPI";
 
-function PlayerRoom(){
+function PlayerRoom() {
   const { roomId } = useParams();
   const [searchParams] = useSearchParams();
   const playerId = searchParams.get("playerId");
@@ -13,40 +15,57 @@ function PlayerRoom(){
   const [question, setQuestion] = useState(null);
   const [questionClosed, setQuestionClosed] = useState(null);
   const [finalResult, setFinalResult] = useState(null);
-  const [selectedOption, setSelectedOption] = useState(null);
+  const [selectedOptions, setSelectedOptions] = useState([]);
   const [submitted, setSubmitted] = useState(false);
   const [timeLeft, setTimeLeft] = useState(0);
   const [error, setError] = useState("");
+  const [friendIds, setFriendIds] = useState(new Set());
 
   useEffect(() => {
-    if(!playerId){
+    let mounted = true;
+    async function loadFriends() {
+      try {
+        if (!auth?.currentUser?.uid) return;
+        const res = await userAPI.friend.get();
+        const list = res?.data?.getFriendsForUser || [];
+        if (mounted) setFriendIds(new Set(list.map(f => f._id)));
+      } catch (e) {
+        console.error('could not load friends', e);
+      }
+    }
+    loadFriends();
+    return () => { mounted = false; };
+  }, [auth?.currentUser?.uid]);
+
+  useEffect(() => {
+    if (!playerId) {
       setError("Missing player information");
       return;
     }
 
-    if(!gameSocket.connected){
+    if (!gameSocket.connected) {
       gameSocket.connect();
     }
 
-    function onRoomSnapshot(snapshot){
+    function onRoomSnapshot(snapshot) {
       setRoom(snapshot);
     }
 
-    function onQuestionStarted(payload){
+    function onQuestionStarted(payload) {
       setQuestion(payload);
       setQuestionClosed(null);
       setFinalResult(null);
-      setSelectedOption(null);
+      setSelectedOptions([]);
       setSubmitted(false);
       setError("");
     }
 
-    function onQuestionClosed(payload){
+    function onQuestionClosed(payload) {
       setQuestionClosed(payload);
       setSubmitted(true);
     }
 
-    function onQuizFinished(payload){
+    function onQuizFinished(payload) {
       setFinalResult(payload);
       localStorage.setItem('quiz_leaderboard', JSON.stringify(payload.leaderboard));
       window.dispatchEvent(
@@ -60,7 +79,7 @@ function PlayerRoom(){
     gameSocket.on('quiz_finished', onQuizFinished);
 
     gameSocket.emit('player_reconnect', { roomId, playerId }, (response) => {
-      if(!response?.ok){
+      if (!response?.ok) {
         setError(response?.error || "Could not reconnect to room");
         return;
       }
@@ -78,7 +97,7 @@ function PlayerRoom(){
 
   useEffect(() => {
     const timer = setInterval(() => {
-      if(!room?.questionEndsAt){
+      if (!room?.questionEndsAt) {
         setTimeLeft(0);
         return;
       }
@@ -94,20 +113,20 @@ function PlayerRoom(){
     return room?.players?.find((player) => player.playerId === playerId) || null;
   }, [room, playerId]);
 
-  function submitAnswer(){
+  function submitAnswer() {
     setError("");
 
-    if(!question){
+    if (!question) {
       setError("No active question");
       return;
     }
 
-    if(selectedOption === null){
+    if (selectedOptions.length === 0) {
       setError("Please choose an option");
       return;
     }
 
-    if(submitted){
+    if (submitted) {
       setError("You already answered this question");
       return;
     }
@@ -118,10 +137,10 @@ function PlayerRoom(){
         roomId,
         playerId,
         questionIndex: question.questionIndex,
-        selectedOption
+        selectedOptions
       },
       (response) => {
-        if(!response?.ok){
+        if (!response?.ok) {
           setError(response?.error || "Could not submit answer");
           return;
         }
@@ -131,17 +150,16 @@ function PlayerRoom(){
     );
   }
 
-  function openLeaderboard(){
+  function openLeaderboard() {
     navigate('/leaderboard');
   }
 
   return (
     <Box sx={{ display: "flex", flexDirection: "column", minHeight: "75vh", fontFamily: "Gill Sans, sans-serif" }}>
       <Box>
-        <Typography variant="h1">Player Room</Typography>
-
         {room ? (
           <>
+            <Typography variant="h1">{room.quizName}</Typography>
             <Typography variant="body1" fontWeight="bold">PIN: {room.pin}</Typography>
             <Typography variant="body1" fontWeight="bold">Status: {room.status}</Typography>
             <Typography variant="body1" fontWeight="bold">Your Score: {me ? me.score : 0}</Typography>
@@ -158,25 +176,41 @@ function PlayerRoom(){
 
       {question ? (
         <Box>
-          <Typography variant="h2">
+          <Typography variant="h3">
             Question {question.questionIndex + 1} of {question.totalQuestions}
           </Typography>
-          <Typography variant="body1">{question.questionText}</Typography>
+          <Typography variant="subtitle1">{question.questionText}</Typography>
 
-          <Box>
-            {question.options.map((option, index) => (
-              <Button
-                key={index}
-                onClick={() => {
-                  if(!submitted){
-                    setSelectedOption(index);
-                  }
-                }}
-                disabled={submitted}
-              >
-                {index + 1}. {option}
-              </Button>
-            ))}
+          <Box sx={{ mt: 2, display: "flex", flexDirection: "column", gap: 1 }}>
+            {question.options.map((option, index) => {
+              const selected = selectedOptions.includes(index);
+
+              return (
+                <Button
+                  key={index}
+                  onClick={() => {
+                    if (submitted) return;
+
+                    if (selected) {
+                      setSelectedOptions(prev =>
+                        prev.filter(i => i !== index)
+                      );
+                    } else {
+                      setSelectedOptions(prev =>
+                        [...prev, index].sort((a, b) => a - b)
+                      );
+                    }
+                  }}
+                  variant={selected ? "contained" : "outlined"}
+                  sx={{
+                    width: "70%",
+                    alignSelf: "center"
+                  }}
+                >
+                  {index + 1}. {option}
+                </Button>
+              );
+            })}
           </Box>
 
           <Button
@@ -191,37 +225,60 @@ function PlayerRoom(){
 
       {questionClosed ? (
         <Box>
-          <Typography variant="h2">Round Result</Typography>
+          <Typography variant="h3">Round Result</Typography>
           <Typography variant="body1">
-            <strong>Correct Option:</strong> Option {questionClosed.correctOption + 1}
+            <strong>Correct Options:</strong>{" "}
+            {questionClosed.correctOptions
+              .map(opt => `Option ${opt + 1}`)
+              .join(", ")}
           </Typography>
           <Typography variant="body1">
-            {selectedOption === questionClosed.correctOption
-              ? "You got it right."
-              : "You got it wrong."}
+            {questionClosed.correctOptions.every(opt =>
+              selectedOptions.includes(opt)
+            ) &&
+              selectedOptions.length === questionClosed.correctOptions.length
+              ? "You got it correct."
+              : "You got it wrong."
+            }
           </Typography>
         </Box>
       ) : null}
 
       {room?.leaderboard?.length ? (
         <Box>
-          <Typography variant="h2">Live Leaderboard</Typography>
+          <Typography variant="h3">Leaderboard</Typography>
 
           <TableContainer>
             <Table>
               <TableHead>
-                <tr>
-                  <th>#</th>
-                  <th>Player</th>
-                  <th>Score</th>
-                </tr>
+                <TableRow>
+                  <TableCell align="center">#</TableCell>
+                  <TableCell align="center">Player</TableCell>
+                  <TableCell align="center">Score</TableCell>
+                </TableRow>
               </TableHead>
               <TableBody>
                 {room.leaderboard.map((player) => (
                   <TableRow key={player.playerId}>
-                    <TableCell>{player.rank}</TableCell>
-                    <TableCell>{player.name}</TableCell>
-                    <TableCell>{player.score}</TableCell>
+                    <TableCell align="center">{player.rank}</TableCell>
+                    <TableCell sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Typography>{player.name}</Typography>
+                      </Box>
+                      <Box>
+                        {auth?.currentUser?.uid && player.uid && player.uid !== auth.currentUser.uid && !friendIds.has(player.uid) ? (
+                          <Button size="small" variant="outlined" onClick={async () => {
+                            try {
+                              gameSocket.emit("sendFriendRequest", { uid: auth.currentUser.uid, friendId: player.uid });
+                              setFriendIds(s => new Set([...Array.from(s), player.uid]));
+                            } catch (e) {
+                              console.error('friend request failed', e);
+                            }
+                          }}>Add Friend</Button>
+                        ) : null}
+                      </Box>
+                    </TableCell>
+                    <TableCell align="center">{player.score}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>

@@ -3,13 +3,19 @@ export const typeDefs = `#graphql
     questionText: String
     options: [String!]
     correctOption: Int
+    correctOptions: [Int!]
   }
 
   type Quiz {
     _id: String
     quizName: String
     createdBy: String
+    createdByUid: String
+    createdByName: String
     createdAt: String
+    updatedAt: String
+    copiedFromQuizId: String
+    timesPlayed: Int
     questions: [Question]
   }
 
@@ -33,74 +39,105 @@ export const typeDefs = `#graphql
     timestamp: String!
   }
 
-input QuizResultInput {
-  name: String!
-  moderator_id: String!
-  quiz_id: String!
-  questions_correct: Int!
-  questions_total: Int!
-  placement: Int!
-  num_participants: Int!
-  timestamp: String!
-}
+  type LeaderboardEntry {
+    rank: Int
+    playerId: String
+    uid: String
+    name: String
+    score: Int
+    connected: Boolean
+    answeredCurrentQuestion: Boolean
+  }
 
-type QuizResult {
-  name: String
-  moderator_id: String
-  quiz_id: String
-  questions_correct: Int
-  questions_total: Int
-  placement: Int
-  num_participants: Int
-  timestamp: String
-  moderator_name: String
-}
+  type CompletedQuiz {
+    roomId: String
+    quizId: String
+    quizName: String
+    pin: String
+    totalQuestions: Int
+    numPlayers: Int
+    finishedAt: String
+    leaderboard: [LeaderboardEntry]
+    moderator_id: String
+    moderator_name: String
+  }
 
-type User {
-  _id: String!
-  name: String!
-  email: String!
-  friends: [Friend!]!
-  quiz_history: [QuizResult!]!
-}
+  input QuizResultInput {
+    name: String!
+    moderator_id: String!
+    quiz_id: String!
+    questions_correct: Int!
+    questions_total: Int!
+    placement: Int!
+    num_participants: Int!
+    timestamp: String!
+  }
 
-input QuestionInput {
-  questionText: String!
-  options: [String!]!
-  correctOption: Int!
-}
+  type QuizResult {
+    name: String
+    moderator_id: String
+    quiz_id: String
+    questions_correct: Int
+    questions_total: Int
+    placement: Int
+    num_participants: Int
+    timestamp: String
+    moderator_name: String
+  }
 
-input QuizInput {
-  quizName: String!
-  createdBy: String
-  questions: [QuestionInput!]!
-}
+  type User {
+    _id: String!
+    name: String!
+    email: String!
+    friends: [Friend!]!
+    quiz_history: [QuizResult!]!
+  }
 
-type Query {
-  getQuizCatalog: [Quiz]
-  getQuizSessionByCode(code: String!): QuizSession
+  input QuestionInput {
+    questionText: String!
+    options: [String!]!
+    correctOption: Int
+    correctOptions: [Int!]
+  }
 
+  input QuizInput {
+    quizName: String!
+    createdBy: String
+    createdByUid: String
+    createdByName: String
+    questions: [QuestionInput!]!
+  }
 
-  getUser: User
-  getFriendRequestsForUser: [FriendRequest]
-  getFriendsForUser: [Friend]
-}
+  type Query {
+    getQuizCatalog: [Quiz]
+    getQuizById(quizId: String!): Quiz
+    getQuizSessionByCode(code: String!): QuizSession
 
-type Mutation {
-  createQuiz(quiz: QuizInput!): Quiz
-  startQuizSession(quizId: String!): QuizSession
+    getGamesUserById(id: String!): [CompletedQuiz]
 
-  createUser: User
-  addFriend(friendId: String!): User
-  removeFriend(friendId: String!): User
-  updateLastInteracted(friendId: String!): User
+    getUser: User
+    getUserById(id: String!): User
+    getFriendRequestsForUser: [FriendRequest]
+    getFriendsForUser: [Friend]
+  }
 
-  addQuizToHistory(quizResult: QuizResultInput!): User
+  type Mutation {
+    createQuiz(quiz: QuizInput!): Quiz
+    updateQuiz(quizId: String!, quiz: QuizInput!): Quiz
+    duplicateQuiz(quizId: String!): Quiz
+    deleteQuiz(quizId: String!): Boolean
+    startQuizSession(quizId: String!): QuizSession
 
-  blockUser(friendId: String!): Boolean
-  unblockUser(friendId: String!): Boolean
-  createFriendRequest(friendId: String!): Boolean
-  processFriendRequest(friendId: String!, accept: Boolean!): Boolean
-}
+    createUser: User
+    addFriend(friendId: String!): User
+    removeFriend(friendId: String!): User
+    updateLastInteracted(friendId: String!): User
 
+    addQuizToHistory(quizResult: QuizResultInput!): User
+
+    blockUser(friendId: String!): Boolean
+    unblockUser(friendId: String!): Boolean
+    createFriendRequest(friendId: String!): Boolean
+    processFriendRequest(friendId: String!, accept: Boolean!): Boolean
+  }
 `;

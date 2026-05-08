@@ -13,6 +13,7 @@ import {
 } from 'firebase/auth';
 
 import {userAPI} from '../components/users/userAPI.js';
+import {gameSocket} from "../socket.js";
 
 async function createNewUserByEmail(email, password, username) {
     const auth = getAuth();
@@ -43,6 +44,7 @@ async function loginGoogle() {
 async function loginEmail(email, password) {
   let auth = getAuth();
   await signInWithEmailAndPassword(auth, email, password);
+  await userAPI.user.create(); // In case seeding has occurred since the account was created. i.e. make an account with google, seed, log back in
 }
 
 async function resetPassword(email) {
@@ -53,6 +55,8 @@ async function resetPassword(email) {
 
 async function logOut() {
   let auth = getAuth();
+  gameSocket.emit("changeStatus", { uid: auth.currentUser.uid, status: "offline" });
+  gameSocket.emit("leavePersonalRoom", { uid: auth.currentUser.uid });
   await signOut(auth);
 }
 

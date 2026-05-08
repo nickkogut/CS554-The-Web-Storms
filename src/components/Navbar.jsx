@@ -1,10 +1,14 @@
 import { Link } from "react-router-dom";
 import { useContext } from "react";
 import { AuthContext } from "../context/AuthContext";
-import { AppBar, Toolbar, Button } from "@mui/material";
+import Mailbox from "./Mailbox.jsx";
+import LogOutButton from "./auth/LogOutButton.jsx";
+import { AppBar, Toolbar, Button, Box } from "@mui/material";
 
 function Navbar(){
+  let uid;
   const {currentUser} = useContext(AuthContext);
+  if(currentUser) {uid = currentUser.uid;}
 
   return(
     <AppBar position="static">
@@ -12,15 +16,20 @@ function Navbar(){
             <Button component={Link} to="/" color="secondary" variant="contained" size="small">Home</Button>
 
             {currentUser ? 
-
+            
             (
-            <Button component={Link} to='/signout' sx={{ ml:"auto" }} color="secondary" variant="contained" size="small">Sign Out</Button>
+            <Box sx={{ml: "auto", display: "flex", alignItems: "center", gap: "20px"}}>
+            <Button component={Link} to={`/player/${uid}`} color="secondary" variant="contained" size="small">Profile</Button>
+            <Mailbox/>
+            <LogOutButton/>
+            </Box>
             ) : 
 
             (
             <Button component={Link} to='/login' sx={{ ml:"auto" }} color="secondary" variant="contained" size="small">Log In</Button>
             )
             }
+
         </Toolbar>
     </AppBar>
   )

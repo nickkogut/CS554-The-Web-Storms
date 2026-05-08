@@ -1,4 +1,6 @@
 import authorizedRequest from '../../../authorizedRequest.js';
+import publicRequest from '../../../publicRequest.js';
+import { gameSocket } from '../../socket.js';
 
 export const userAPI = {
   user: {},
@@ -20,22 +22,18 @@ userAPI.user.create = async () => {
   });
 };
 
-userAPI.user.get = async (id) => {
+userAPI.user.get = async () => {
   return authorizedRequest({
     type: "query",
     query: `
-      user {
-        getUser {
-          _id
-          name
-          email
-        }
+      getUser {
+        _id
+        name
+        email
       }
     `,
-    variables: {id}
   });
 };
-
 
 userAPI.friend.add = async (friendId) => {
   return authorizedRequest({
@@ -54,7 +52,10 @@ userAPI.friend.remove = async (friendId) => {
     type: "mutation",
     query: `
       mutation RemoveFriend($friendId: String!) {
-        removeFriend(friendId: $friendId)
+        removeFriend(friendId: $friendId) {
+          _id
+          name
+        }
       }
     `,
     variables: { friendId }
@@ -73,7 +74,7 @@ userAPI.friend.updateLastInteracted = async (friendId) => {
   });
 };
 
-userAPI.friend.get = async (id) => {
+userAPI.friend.get = async (_id) => {
   return authorizedRequest({
     query: `
       query {
@@ -85,7 +86,7 @@ userAPI.friend.get = async (id) => {
         }
       }
     `,
-    variables: {id}
+    variables: {_id}
   });
 };
 
@@ -122,7 +123,12 @@ userAPI.friend.processRequest = async (friendId, accept) => {
     type: "mutation",
     query: `
       mutation ProcessFriendRequest($friendId: String!, $accept: Boolean!) {
-        processFriendRequest(friendId: $friendId, accept: $accept)
+        processFriendRequest(friendId: $friendId, accept: $accept) {
+          _id
+          name
+          friendTimestamp
+          lastInteracted
+        }
       }
     `,
     variables: { friendId, accept }
@@ -181,6 +187,45 @@ userAPI.getUserById = async (id) => {
             friendTimestamp
             lastInteracted
           }
+        }
+      }
+    `,
+    variables: { id }
+  });
+};
+
+userAPI.getGamesByUserId = async (id) => {
+  return publicRequest({
+    query: `
+      query GetGamesByUserId($id: String!){
+        getGamesUserById(id: $id){
+          roomId
+          quizName
+          pin
+          numPlayers
+          finishedAt
+          leaderboard {
+            rank
+            playerId
+            uid
+            name
+            score
+          }
+        }
+      }
+    `,
+    variables: { id }
+  });
+};
+
+userAPI.getUserById = async (id) => {
+  return publicRequest({
+    query: `
+      query GetUserById($id: String!){
+        getUserById(id: $id){
+          _id
+          name
+          email
         }
       }
     `,

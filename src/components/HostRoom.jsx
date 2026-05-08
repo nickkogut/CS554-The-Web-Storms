@@ -1,7 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { gameSocket } from "../../socket.js";
-import { Typography, Box, Button, TableContainer, TableCell, TableHead, TableRow, TableBody, Alert, Paper, Table } from "@mui/material";
+import { gameSocket } from "../socket.js";
+import { Typography, Box, Button, TableContainer, TableCell, TableHead, TableRow, TableBody, Alert, Paper, Table, FormGroup, Checkbox, FormControlLabel } from "@mui/material";
+import { auth } from "../firebase/FirebaseConfig";
+import WaitingRoom from "./WaitingRoom.jsx";
 
 function HostRoom() {
   const { roomId } = useParams();
@@ -14,6 +16,21 @@ function HostRoom() {
   const [error, setError] = useState("");
   const [timeLeft, setTimeLeft] = useState(0);
   const [actionLoading, setActionLoading] = useState(false);
+  const [autoNext, setAutoNext] = useState(false);
+
+  // These useRefs are needed to make delayedHandleNextQuestion see updated values
+  const autoNextRef = useRef(autoNext);  
+  const roomRef = useRef(room);
+
+  useEffect(() => {
+    autoNextRef.current = autoNext;
+  }, [autoNext]);
+
+  
+
+  useEffect(() => {
+    roomRef.current = room;
+  }, [room]);
 
   useEffect(() => {
     if(!gameSocket.connected){
@@ -22,16 +39,16 @@ function HostRoom() {
 
     function onRoomSnapshot(snapshot){
       setRoom(snapshot);
+
+      if (autoNextRef.current) {
+        delayedHandleNextQuestion();
+      }
     }
 
     function onQuestionStarted(payload){
       setQuestion(payload);
       setQuestionClosed(null);
       setFinalResult(null);
-    }
-
-    function onQuestionClosed(payload){
-      setQuestionClosed(payload);
     }
 
     function onQuizFinished(payload){
@@ -52,7 +69,6 @@ function HostRoom() {
         setError(response?.error || "Could not load room");
         return;
       }
-
       setRoom(response.room);
     });
 
@@ -100,7 +116,10 @@ function HostRoom() {
     });
   }
 
-  function handleNextQuestion(){
+
+
+  function handleNextQuestion() {
+    if (roomRef.current?.status !== "review" || roomRef.current?.currentQuestionIndex == roomRef.current?.totalQuestions) return; // canNext
     setError("");
     setActionLoading(true);
 
@@ -113,23 +132,39 @@ function HostRoom() {
     });
   }
 
+    function delayedHandleNextQuestion() {
+      setTimeout(() => {
+        if (autoNextRef.current) handleNextQuestion(); // If the user hasn't unchecked the box in the meantime, auto handle the next question
+      }, 8000);
+  }
+
+  function onQuestionClosed(payload) {
+    setQuestionClosed(payload);
+  }
+
   function goToLeaderboard(){
     navigate('/leaderboard');
   }
 
+  const handleAutoNextChange = (e) => {
+    setAutoNext(e.target.checked);
+    if (e.target.checked) {
+      delayedHandleNextQuestion();
+    }
+  };
+
   return (
     <Box sx={{ display: "flex", flexDirection: "column", minHeight: "75vh", fontFamily: "Gill Sans, sans-serif" }}>
       <Box>
-        <Typography variant="h1">Host Room</Typography>
-
         {room ? (
           <>
+            <Typography variant="h1">Host - {room.quizName}</Typography>
             <Typography variant="body1" fontWeight="bold">PIN: {room.pin}</Typography>
             <Typography variant="body1" fontWeight="bold">Status: {room.status}</Typography>
             <Typography variant="body1" fontWeight="bold">Players Joined: {playerCount}</Typography>
 
             {room.status === 'question' ? (
-              <Typography variant="body1" fontWeight="bold">Time Left: {timeLeft}s</Typography>
+              <Typography variant="subtitle1" fontWeight="bold">Time Left: {timeLeft}s</Typography>
             ) : null}
 
             {error && <Alert severity="error">{error}</Alert>}
@@ -145,14 +180,23 @@ function HostRoom() {
             ) : null}
 
             {canNext ? (
-              <Button
-                variant="contained"
-                onClick={handleNextQuestion}
-                disabled={actionLoading}
-              >
-                {actionLoading ? 'Loading...' : 'Next Question'}
-              </Button>
+              <>
+                <Button
+                  variant="contained"
+                  onClick={handleNextQuestion}
+                  disabled={actionLoading}
+                >
+                  {actionLoading ? 'Loading...' : 'Next Question'}
+                </Button>
+            </>
             ) : null}
+            <br/>
+            {(room?.currentQuestionIndex < room?.totalQuestions - 1) &&
+            
+            <FormControlLabel control={<Checkbox variant="contained" onChange={(e) => handleAutoNextChange(e)}/>} label="Automatically Continue (after 8s)" />
+              }
+            {/* Auto next button is always shown once the quiz has started so the host doesn't have to wait to leave */}
+
 
             {finalResult ? (
               <Button
@@ -163,21 +207,22 @@ function HostRoom() {
               </Button>
             ) : null}
           </>
-        ) : (
+        ) : (error ? <Alert severity="error">Error: Room not found.</Alert>
+          :
           <Typography variant="body1">Loading room...</Typography>
         )}
       </Box>
 
       {question ? (
         <Box>
-          <Typography variant="h2">
+          <Typography variant="h3">
             Question {question.questionIndex + 1} of {question.totalQuestions}
           </Typography>
           <Typography variant="body1">{question.questionText}</Typography>
 
           <Box>
             {question.options.map((option, index) => (
-              <Box key={index}>
+              <Box key={index} sx={{margin: "5px 0"}}>
                 {index + 1}. {option}
               </Box>
             ))}
@@ -187,42 +232,29 @@ function HostRoom() {
 
       {room?.players?.length ? (
         <Box>
-          <Typography variant="h2">Players</Typography>
+          <Typography variant="h3">Players</Typography>
 
-          <Box>
-            <TableContainer component={Paper}>
-              <Table>
-                <TableHead>
-                  <TableRow>
-                    <TableCell>#</TableCell>
-                    <TableCell>Name</TableCell>
-                    <TableCell>Score</TableCell>
-                    <TableCell>Connected</TableCell>
-                    <TableCell>Answered</TableCell>
-                  </TableRow>
-                </TableHead>
-              <TableBody>
-                {room.players.map((player, index) => (
-                  <TableRow key={player.playerId}>
-                    <TableCell>{index + 1}</TableCell>
-                    <TableCell>{player.name}</TableCell>
-                    <TableCell>{player.score}</TableCell>
-                    <TableCell>{player.connected ? "Yes" : "No"}</TableCell>
-                    <TableCell>{player.answeredCurrentQuestion ? "Yes" : "No"}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-              </Table>
-            </TableContainer>
-          </Box>
+          <WaitingRoom
+            mode={room.status === 'question' ? 'question' : 'waiting'}
+            isHost={true}
+            joinedCount={room.players.length}
+            questionEndTime={room.questionEndsAt}
+            questionDuration={15}
+            unansweredCount={room.players.filter(p => !p.answeredCurrentQuestion).length}
+            players={room.players.map(p => ({
+                id: p.playerId,
+                name: p.name,
+                answered: p.answeredCurrentQuestion
+            }))}
+          />
         </Box>
       ) : null}
 
       {questionClosed ? (
         <Box>
-          <Typography variant="h2">Round Result</Typography>
+          <Typography variant="h3">Round Result</Typography>
           <Typography variant="body1">
-            <strong>Correct Option:</strong> Option {questionClosed.correctOption + 1}
+            <strong>Correct Option:</strong> Option {questionClosed.correctOption + 1} - {question.options[questionClosed.correctOption]}
           </Typography>
 
           <Box>
@@ -237,7 +269,7 @@ function HostRoom() {
                 <TableBody>
                   {questionClosed.answerStats.map((count, index) => (
                     <TableRow key={index}>
-                      <TableCell>Option {index + 1}</TableCell>
+                      <TableCell>Option {index + 1} - {question.options[index]}</TableCell>
                       <TableCell>{count}</TableCell>
                     </TableRow>
                   ))}

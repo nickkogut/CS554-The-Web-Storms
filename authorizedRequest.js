@@ -1,5 +1,5 @@
 import { gql } from '@apollo/client';
-import { getAuth } from 'firebase/auth';
+import {auth} from "./src/firebase/FirebaseConfig.js";
 import client from './apolloClient.js';
 
 const authorizedRequest = async ({ query, variables = {}, type = "query" }) => {
@@ -22,7 +22,6 @@ const authorizedRequest = async ({ query, variables = {}, type = "query" }) => {
   });
   */
 
-  const auth = getAuth();
   if (!auth.currentUser) throw new Error("User not authenticated");
   const token = await auth.currentUser.getIdToken();
 
