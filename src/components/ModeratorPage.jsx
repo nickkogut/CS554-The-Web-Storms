@@ -420,7 +420,7 @@ export default function ModeratorPage() {
                             type="button"
                             variant="contained"
                             endIcon={<SendIcon />}
-                            onClick={buttonOnSend}
+                            onClick={() => buttonOnSend(false)}
                             disabled={isSubmitting}
                         >
                             {isSubmitting ? 'Saving...' : 'Save'}

@@ -634,20 +634,16 @@ export default function QuizCatalog() {
                                                         Copy Quiz
                                                     </Button>
 
-                                                    <Button
-                                                        color="error"
-                                                        variant="outlined"
-                                                        startIcon={
-                                                            <DeleteIcon />
-                                                        }
-                                                        onClick={() =>
-                                                            handleDelete(
-                                                                quiz
-                                                            )
-                                                        }
-                                                    >
-                                                        Delete Quiz
-                                                    </Button>
+                                                    {quiz.createdByUid === auth?.currentUser?.uid && (
+                                                        <Button
+                                                            color="error"
+                                                            variant="outlined"
+                                                            startIcon={<DeleteIcon />}
+                                                            onClick={() => handleDelete(quiz)}
+                                                        >
+                                                            Delete Quiz
+                                                        </Button>
+                                                    )}
                                                 </Stack>
 
                                                 {session?.code ? (

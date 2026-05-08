@@ -227,15 +227,19 @@ function PlayerRoom() {
         <Box>
           <Typography variant="h3">Round Result</Typography>
           <Typography variant="body1">
-            <strong>Correct Option:</strong> Option {questionClosed.correctOption + 1}
+            <strong>Correct Options:</strong>{" "}
+            {questionClosed.correctOptions
+              .map(opt => `Option ${opt + 1}`)
+              .join(", ")}
           </Typography>
           <Typography variant="body1">
             {questionClosed.correctOptions.every(opt =>
               selectedOptions.includes(opt)
             ) &&
               selectedOptions.length === questionClosed.correctOptions.length
-              ? "You selected a correct option."
-              : "You got it wrong."}
+              ? "You got it correct."
+              : "You got it wrong."
+            }
           </Typography>
         </Box>
       ) : null}
