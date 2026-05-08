@@ -204,6 +204,38 @@ const quizBlueprints = [
 ];
 
 /* =====================================================
+   COMPLETED QUIZZES
+===================================================== */
+
+const completedQuizBlueprints = [
+  {
+    quizKey: 'marvel',
+    players: ['kartik', 'thomas', 'nick'],
+    finishedDaysAgo: 5
+  },
+  {
+    quizKey: 'dc',
+    players: ['thomas', 'praneeth', 'justin'],
+    finishedDaysAgo: 4
+  },
+  {
+    quizKey: 'harry',
+    players: ['praneeth', 'test', 'kartik'],
+    finishedDaysAgo: 3
+  },
+  {
+    quizKey: 'starwars',
+    players: ['justin', 'nick', 'thomas'],
+    finishedDaysAgo: 2
+  },
+  {
+    quizKey: 'mission',
+    players: ['nick', 'kartik', 'justin'],
+    finishedDaysAgo: 1
+  }
+];
+
+/* =====================================================
    HELPERS
 ===================================================== */
 function daysAgo(days) {
@@ -249,6 +281,8 @@ async function ensureAuthIdentity({ key, email, displayName }) {
     }
   }
 }
+
+
 
 /* =====================================================
    MAIN
@@ -382,6 +416,48 @@ async function main() {
       );
     }
   }
+
+/* COMPLETED QUIZZES */
+for (const blueprint of completedQuizBlueprints) {
+  const quizId = quizIdByKey[blueprint.quizKey];
+  const quiz = quizBlueprints.find(q => q.key === blueprint.quizKey);
+
+  const leaderboard = blueprint.players.map((playerKey, index) => {
+    const identity = identities[playerKey];
+    const score = Math.floor(Math.random() * 40) + (60 - index * 15);
+    return {
+      rank: index + 1,
+      playerId: identity.uid,
+      name: identity.displayName,
+      uid: identity.uid,
+      score,
+      connected: true,
+      answeredCurrentQuestion: false
+    };
+  });
+
+  leaderboard.sort((a, b) => b.score - a.score);
+  leaderboard.forEach((entry, i) => entry.rank = i + 1);
+
+  await gamesCol.updateOne(
+    {
+      roomId: `seed-room-${blueprint.quizKey}`  // change filter to this
+    },
+    {
+      $set: {
+        roomId: `seed-room-${blueprint.quizKey}`,
+        quizId,
+        quizName: quiz.quizName,
+        pin: Math.floor(100000 + Math.random() * 900000).toString(),
+        totalQuestions: quiz.questions.length,
+        numPlayers: blueprint.players.length,
+        leaderboard,
+        finishedAt: daysAgo(blueprint.finishedDaysAgo)
+      }
+    },
+    { upsert: true }
+  );
+}
 
   /* GAMES untouched */
   await gamesCol.countDocuments();
