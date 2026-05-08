@@ -38,14 +38,14 @@ function HostQuiz(){
   return (
     <Box sx={{ display: "flex", flexDirection: "column", height: "75vh", fontFamily: "Gill Sans, sans-serif" }}>        
         <Stack spacing={2} alignItems="center" sx={{ margin: "auto", mt: 10 }}>
-            <Button
+            {/* <Button
               onClick={createLiveRoom}
               disabled={loading} >
                 {loading ? "Creating..." : "Start Live Quiz"}
-            </Button>
+            </Button> */}
             <Button component={Link} to ="/create-quiz" variant="contained" size="large">Create Quiz</Button>
             <Button component={Link} to="/search-quizzes" variant="contained" size="large">Search Quizzes</Button>
-            <Button component={Link} to="/waiting-demo" variant="outlined" size="large">Waiting Room Demo</Button>
+            {/* <Button component={Link} to="/waiting-demo" variant="outlined" size="large">Waiting Room Demo</Button> */}
         </Stack>
     </Box>
   );

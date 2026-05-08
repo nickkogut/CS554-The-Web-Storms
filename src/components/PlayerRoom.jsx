@@ -229,8 +229,9 @@ function PlayerRoom() {
           <Typography variant="body1">
             <strong>Correct Options:</strong>{" "}
             {questionClosed.correctOptions
-              .map(opt => `Option ${opt + 1}`)
+              .map(opt => `Option ${opt + 1} - ${question.options[opt]}`)
               .join(", ")}
+              {/* {question.options[questionClosed.correctOption]} */}
           </Typography>
           <Typography variant="body1">
             {questionClosed.correctOptions.every(opt =>
