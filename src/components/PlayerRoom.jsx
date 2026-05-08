@@ -121,7 +121,7 @@ function PlayerRoom() {
       return;
     }
 
-    if (selectedOptions === null) {
+    if (selectedOptions.length === 0) {
       setError("Please choose an option");
       return;
     }
@@ -196,7 +196,9 @@ function PlayerRoom() {
                         prev.filter(i => i !== index)
                       );
                     } else {
-                      setSelectedOptions(prev => [...prev, index]);
+                      setSelectedOptions(prev =>
+                        [...prev, index].sort((a, b) => a - b)
+                      );
                     }
                   }}
                   variant={selected ? "contained" : "outlined"}
@@ -228,7 +230,10 @@ function PlayerRoom() {
             <strong>Correct Option:</strong> Option {questionClosed.correctOption + 1}
           </Typography>
           <Typography variant="body1">
-            {selectedOptions.includes(questionClosed.correctOption)
+            {questionClosed.correctOptions.every(opt =>
+              selectedOptions.includes(opt)
+            ) &&
+              selectedOptions.length === questionClosed.correctOptions.length
               ? "You selected a correct option."
               : "You got it wrong."}
           </Typography>

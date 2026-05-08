@@ -382,6 +382,9 @@ export const resolvers = {
     updateQuiz: async (_, args, context) => {
       const user = requireUser(context);
       const existing = await getQuizByIdFromDb(args.quizId);
+      if (existing.createdByUid !== context.user.uid) {
+        throw new GraphQLError("You can only edit your own quizzes.");
+      }
 
       if (!args.quiz || typeof args.quiz !== 'object') {
         throw new GraphQLError('quiz is required', {

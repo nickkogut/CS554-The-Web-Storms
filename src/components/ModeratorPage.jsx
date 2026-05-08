@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { useSnackbar } from 'notistack';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import authorizedRequest from '../../authorizedRequest.js';
+import { auth } from '../firebase/FirebaseConfig';
+import { gameSocket } from '../socket.js';
 
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
@@ -172,7 +174,7 @@ export default function ModeratorPage() {
         loadQuiz();
     }, [quizId, enqueueSnackbar]);
 
-    const buttonOnSend = async () => {
+    const buttonOnSend = async (hostAfterSave = false) => {
         try {
             validateQuestions();
 
@@ -180,21 +182,21 @@ export default function ModeratorPage() {
 
             const mutation = quizId
                 ? `
-          mutation UpdateQuiz($quizId: String!, $quiz: QuizInput!) {
-            updateQuiz(quizId: $quizId, quiz: $quiz) {
-              _id
-              quizName
+            mutation UpdateQuiz($quizId: String!, $quiz: QuizInput!) {
+                updateQuiz(quizId: $quizId, quiz: $quiz) {
+                    _id
+                    quizName
+                }
             }
-          }
-        `
+            `
                 : `
-          mutation CreateQuiz($quiz: QuizInput!) {
-            createQuiz(quiz: $quiz) {
-              _id
-              quizName
+            mutation CreateQuiz($quiz: QuizInput!) {
+                createQuiz(quiz: $quiz) {
+                    _id
+                    quizName
+                }
             }
-          }
-        `;
+            `;
 
             setIsSubmitting(true);
 
@@ -223,24 +225,77 @@ export default function ModeratorPage() {
                 throw new Error(result.errors[0].message);
             }
 
+            const savedQuiz = quizId
+                ? result.data.updateQuiz
+                : result.data.createQuiz;
+
             enqueueSnackbar(
-                quizId
-                    ? `Quiz "${result.data.updateQuiz.quizName}" updated successfully.`
-                    : `Quiz "${result.data.createQuiz.quizName}" saved successfully.`,
+                `Quiz "${savedQuiz.quizName}" ${quizId ? 'updated' : 'saved'
+                } successfully.`,
                 { variant: 'success' }
             );
 
+            // SAVE & HOST FLOW
+            if (hostAfterSave) {
+                if (!gameSocket.connected) {
+                    gameSocket.connect();
+                }
+
+                gameSocket.emit(
+                    'create_room',
+                    {
+                        hostName:
+                            auth?.currentUser?.displayName ||
+                            auth?.currentUser?.email ||
+                            'Host',
+
+                        quizName: quizName.trim(),
+
+                        questions: payload.map((q) => ({
+                            questionText: q.questionText,
+                            options: q.options,
+
+                            correctOption:
+                                q.correctOptions.length === 1
+                                    ? q.correctOptions[0]
+                                    : null,
+
+                            correctOptions: q.correctOptions
+                        }))
+                    },
+                    (response) => {
+                        if (!response?.ok) {
+                            enqueueSnackbar(
+                                response?.error ||
+                                'Could not start live session.',
+                                { variant: 'error' }
+                            );
+                            return;
+                        }
+
+                        navigate(`/host-room/${response.roomId}`);
+                        enqueueSnackbar(
+                            `Session started. Code: ${response.roomId}`,
+                            { variant: 'success' }
+                        );
+                    }
+                );
+
+                return;
+            }
+
+            // NORMAL SAVE FLOW
             if (!quizId) {
                 setQuestions([createBlankQuestion()]);
                 setQuizName('');
-                navigate('/my-quizzes');
-            } else {
-                navigate('/my-quizzes');
             }
+
+            navigate('/my-quizzes');
         } catch (error) {
-            enqueueSnackbar(error.message || 'Something went wrong.', {
-                variant: 'error'
-            });
+            enqueueSnackbar(
+                error.message || 'Something went wrong.',
+                { variant: 'error' }
+            );
         } finally {
             setIsSubmitting(false);
         }
@@ -369,6 +424,17 @@ export default function ModeratorPage() {
                             disabled={isSubmitting}
                         >
                             {isSubmitting ? 'Saving...' : 'Save'}
+                        </Button>
+
+
+                        <Button
+                            type="button"
+                            variant="contained"
+                            endIcon={<SendIcon />}
+                            onClick={() => buttonOnSend(true)}
+                            disabled={isSubmitting}
+                        >
+                            Save & Host
                         </Button>
                     </Stack>
                 </Stack>

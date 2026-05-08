@@ -610,19 +610,15 @@ export default function QuizCatalog() {
                                                         Share
                                                     </Button>
 
-                                                    <Button
-                                                        variant="outlined"
-                                                        startIcon={
-                                                            <EditIcon />
-                                                        }
-                                                        onClick={() =>
-                                                            handleEdit(
-                                                                quiz
-                                                            )
-                                                        }
-                                                    >
-                                                        Edit
-                                                    </Button>
+                                                    {quiz.createdByUid === auth?.currentUser?.uid && (
+                                                        <Button
+                                                            variant="outlined"
+                                                            startIcon={<EditIcon />}
+                                                            onClick={() => handleEdit(quiz)}
+                                                        >
+                                                            Edit
+                                                        </Button>
+                                                    )}
 
                                                     <Button
                                                         variant="outlined"
