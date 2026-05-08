@@ -360,7 +360,7 @@ io.on('connection', (socket) => {
       else{
       const requestedCount = Number(payload?.questionCount || DEFAULT_QUESTION_COUNT);
       const questionCount = Number.isInteger(requestedCount) && requestedCount > 0 ? requestedCount : DEFAULT_QUESTION_COUNT;
-      const questions = await getRecentQuestions(questionCount);
+      questions = await getRecentQuestions(questionCount);
       }
       
       if(!questions.length){
