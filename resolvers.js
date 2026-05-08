@@ -362,20 +362,6 @@ export const resolvers = {
       if (!context.user) throw new GraphQLError("Not authenticated");
 
       const user = await getUser(context.user.uid); // Throws if no user found
-<<<<<<< Updated upstream
-      return user;
-    },
-
-    getUserById: async (_, { id }) => {
-      try {
-        const user = await getUser(id);
-        return user;
-      } catch {
-        throw new GraphQLError('User not found', {
-          extensions: { code: 'NOT_FOUND' }
-        });
-      }
-=======
       return normalizeUser(user);
     },
 
@@ -397,7 +383,6 @@ export const resolvers = {
         });      
       }
       return games;
->>>>>>> Stashed changes
     }
   },
 

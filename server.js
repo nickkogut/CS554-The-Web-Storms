@@ -539,7 +539,6 @@ io.on('connection', (socket) => {
       error: e.message || 'Unable to create room'
     });
   }
-});
 
     try{
       const hostName = ensureString(payload?.hostName || 'Host', 'Host name');
