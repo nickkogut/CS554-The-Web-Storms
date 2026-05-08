@@ -2,6 +2,8 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSnackbar } from 'notistack';
 import authorizedRequest from '../../authorizedRequest.js';
+import { auth } from '../firebase/FirebaseConfig';
+import { gameSocket } from '../socket.js';
 
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
@@ -48,38 +50,47 @@ export default function QuizCatalog() {
     const [quizzes, setQuizzes] = useState([]);
     const [search, setSearch] = useState('');
     const [sortBy, setSortBy] = useState('name');
+    const [scope, setScope] = useState('all');
     const [loading, setLoading] = useState(true);
     const [sessionsByQuizId, setSessionsByQuizId] = useState({});
 
     const loadCatalog = async () => {
         setLoading(true);
+
         try {
             const result = await authorizedRequest({
                 type: 'query',
                 query: `
-          query GetQuizCatalog {
-            getQuizCatalog {
-              _id
-              quizName
-              createdByUid
-              createdByName
-              createdAt
-              updatedAt
-              timesPlayed
-              questions {
-                questionText
-                options
-                correctOptions
-              }
-            }
-          }
-        `
+                query GetQuizCatalog {
+                    getQuizCatalog {
+                        _id
+                        quizName
+                        createdByUid
+                        createdByName
+                        createdAt
+                        updatedAt
+                        timesPlayed
+                        questions {
+                            questionText
+                            options
+                            correctOption
+                            correctOptions
+                        }
+                    }
+                }
+                `
             });
 
-            setQuizzes(Array.isArray(result.data?.getQuizCatalog) ? result.data.getQuizCatalog : []);
+            setQuizzes(
+                Array.isArray(result.data?.getQuizCatalog)
+                    ? result.data.getQuizCatalog
+                    : []
+            );
         } catch (error) {
             setQuizzes([]);
-            enqueueSnackbar(error.message || 'Could not load quizzes.', { variant: 'error' });
+            enqueueSnackbar(error.message || 'Could not load quizzes.', {
+                variant: 'error'
+            });
         } finally {
             setLoading(false);
         }
@@ -87,61 +98,107 @@ export default function QuizCatalog() {
 
     useEffect(() => {
         loadCatalog();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     const filteredQuizzes = useMemo(() => {
         const q = search.trim().toLowerCase();
 
         let list = quizzes.filter((quiz) => {
+            const mine =
+                quiz.createdByUid === auth?.currentUser?.uid ||
+                (quiz.createdByName || '').toLowerCase() ===
+                (auth?.currentUser?.displayName || '').toLowerCase();
+
+            if (scope === 'mine' && !mine) return false;
+
             if (!q) return true;
-            const name = (quiz.quizName || '').toLowerCase();
-            const creatorName = (quiz.createdByName || '').toLowerCase();
-            const creatorUid = (quiz.createdByUid || '').toLowerCase();
-            return name.includes(q) || creatorName.includes(q) || creatorUid.includes(q);
+
+            return (
+                (quiz.quizName || '').toLowerCase().includes(q) ||
+                (quiz.createdByName || '').toLowerCase().includes(q) ||
+                (quiz.createdByUid || '').toLowerCase().includes(q)
+            );
         });
 
         const sorted = [...list];
+
         if (sortBy === 'name') {
-            sorted.sort((a, b) => (a.quizName || '').localeCompare(b.quizName || ''));
+            sorted.sort((a, b) =>
+                (a.quizName || '').localeCompare(b.quizName || '')
+            );
         } else if (sortBy === 'creator') {
             sorted.sort((a, b) =>
-                (a.createdByName || a.createdByUid || '').localeCompare(b.createdByName || b.createdByUid || '')
+                (a.createdByName || '').localeCompare(
+                    b.createdByName || ''
+                )
             );
         } else if (sortBy === 'plays') {
-            sorted.sort((a, b) => (b.timesPlayed || 0) - (a.timesPlayed || 0));
+            sorted.sort(
+                (a, b) => (b.timesPlayed || 0) - (a.timesPlayed || 0)
+            );
         }
 
         return sorted;
-    }, [quizzes, search, sortBy]);
+    }, [quizzes, search, sortBy, scope]);
 
     const startSession = async (quiz) => {
-        const result = await authorizedRequest({
-            type: 'mutation',
-            query: `
-        mutation StartQuizSession($quizId: String!) {
-          startQuizSession(quizId: $quizId) {
-            code
-            expiresAt
-            quiz {
-              _id
-              quizName
+        return new Promise((resolve, reject) => {
+            if (!gameSocket.connected) {
+                gameSocket.connect();
             }
-          }
-        }
-      `,
-            variables: { quizId: quiz._id }
+
+            gameSocket.emit(
+                'create_room',
+                {
+                    hostName:
+                        auth?.currentUser?.displayName ||
+                        auth?.currentUser?.email ||
+                        'Host',
+
+                    quizName: quiz.quizName,
+
+                    questions: (quiz.questions || []).map((q) => ({
+                        questionText: q.questionText,
+                        options: q.options || [],
+                        correctOption:
+                            Number.isInteger(q.correctOption)
+                                ? q.correctOption
+                                : null,
+                        correctOptions:
+                            Array.isArray(q.correctOptions) &&
+                                q.correctOptions.length > 0
+                                ? q.correctOptions
+                                : Number.isInteger(q.correctOption)
+                                    ? [q.correctOption]
+                                    : []
+                    }))
+                },
+                (response) => {
+                    if (!response?.ok) {
+                        reject(
+                            new Error(
+                                response?.error ||
+                                'Could not start session.'
+                            )
+                        );
+                        return;
+                    }
+
+                    const session = {
+                        code: response.pin,
+                        roomId: response.roomId,
+                        expiresAt: null
+                    };
+
+                    setSessionsByQuizId((prev) => ({
+                        ...prev,
+                        [quiz._id]: session
+                    }));
+
+                    resolve(session);
+                }
+            );
         });
-
-        const session = result.data?.startQuizSession;
-        if (!session) throw new Error('Could not start session.');
-
-        setSessionsByQuizId((prev) => ({
-            ...prev,
-            [quiz._id]: session
-        }));
-
-        return session;
     };
 
     const ensureSession = async (quiz) => {
@@ -154,16 +211,25 @@ export default function QuizCatalog() {
         try {
             const session = await ensureSession(quiz);
             await navigator.clipboard.writeText(session.code);
-            enqueueSnackbar('Quiz code copied to clipboard.', { variant: 'success' });
+
+            enqueueSnackbar('Quiz code copied to clipboard.', {
+                variant: 'success'
+            });
         } catch {
-            enqueueSnackbar('Could not copy the quiz code.', { variant: 'error' });
+            enqueueSnackbar('Could not copy the quiz code.', {
+                variant: 'error'
+            });
         }
     };
 
     const handleNativeShare = async (quiz) => {
         try {
             const session = await ensureSession(quiz);
-            const shareText = buildShareMessage(session.code, quiz.quizName);
+
+            const shareText = buildShareMessage(
+                session.code,
+                quiz.quizName
+            );
 
             if (navigator.share) {
                 await navigator.share({
@@ -173,26 +239,44 @@ export default function QuizCatalog() {
                 });
             } else {
                 await navigator.clipboard.writeText(shareText);
-                enqueueSnackbar('Share is not supported here. Text copied instead.', {
-                    variant: 'info'
-                });
             }
         } catch {
-            enqueueSnackbar('Share cancelled or unavailable.', { variant: 'warning' });
+            enqueueSnackbar('Share unavailable.', {
+                variant: 'warning'
+            });
         }
     };
 
     const handleEmailShare = async (quiz) => {
         const session = await ensureSession(quiz);
-        const subject = encodeURIComponent(`Join my QuizQuest quiz: ${quiz.quizName}`);
-        const body = encodeURIComponent(buildShareMessage(session.code, quiz.quizName));
-        window.open(`mailto:?subject=${subject}&body=${body}`, '_blank', 'noopener,noreferrer');
+
+        const subject = encodeURIComponent(
+            `Join my QuizQuest quiz: ${quiz.quizName}`
+        );
+
+        const body = encodeURIComponent(
+            buildShareMessage(session.code, quiz.quizName)
+        );
+
+        window.open(
+            `mailto:?subject=${subject}&body=${body}`,
+            '_blank',
+            'noopener,noreferrer'
+        );
     };
 
     const handleWhatsAppShare = async (quiz) => {
         const session = await ensureSession(quiz);
-        const text = encodeURIComponent(buildShareMessage(session.code, quiz.quizName));
-        window.open(`https://wa.me/?text=${text}`, '_blank', 'noopener,noreferrer');
+
+        const text = encodeURIComponent(
+            buildShareMessage(session.code, quiz.quizName)
+        );
+
+        window.open(
+            `https://wa.me/?text=${text}`,
+            '_blank',
+            'noopener,noreferrer'
+        );
     };
 
     const handleEdit = (quiz) => {
@@ -204,26 +288,26 @@ export default function QuizCatalog() {
             const result = await authorizedRequest({
                 type: 'mutation',
                 query: `
-          mutation DuplicateQuiz($quizId: String!) {
-            duplicateQuiz(quizId: $quizId) {
-              _id
-              quizName
-            }
-          }
-        `,
+                mutation DuplicateQuiz($quizId: String!) {
+                    duplicateQuiz(quizId: $quizId) {
+                        _id
+                        quizName
+                    }
+                }
+                `,
                 variables: { quizId: quiz._id }
             });
 
-            if (result.errors?.length) {
-                throw new Error(result.errors[0].message);
-            }
+            enqueueSnackbar(
+                `Quiz duplicated as "${result.data.duplicateQuiz.quizName}".`,
+                { variant: 'success' }
+            );
 
-            enqueueSnackbar(`Quiz duplicated as "${result.data.duplicateQuiz.quizName}".`, {
-                variant: 'success'
-            });
             await loadCatalog();
-        } catch (error) {
-            enqueueSnackbar(error.message || 'Something went wrong.', { variant: 'error' });
+        } catch {
+            enqueueSnackbar('Could not duplicate quiz.', {
+                variant: 'error'
+            });
         }
     };
 
@@ -231,24 +315,42 @@ export default function QuizCatalog() {
         if (!window.confirm(`Delete "${quiz.quizName}"?`)) return;
 
         try {
-            const result = await authorizedRequest({
+            await authorizedRequest({
                 type: 'mutation',
                 query: `
-          mutation DeleteQuiz($quizId: String!) {
-            deleteQuiz(quizId: $quizId)
-          }
-        `,
+                mutation DeleteQuiz($quizId: String!) {
+                    deleteQuiz(quizId: $quizId)
+                }
+                `,
                 variables: { quizId: quiz._id }
             });
 
-            if (result.errors?.length) {
-                throw new Error(result.errors[0].message);
-            }
+            enqueueSnackbar('Quiz deleted successfully.', {
+                variant: 'success'
+            });
 
-            enqueueSnackbar('Quiz deleted successfully.', { variant: 'success' });
             await loadCatalog();
+        } catch {
+            enqueueSnackbar('Could not delete quiz.', {
+                variant: 'error'
+            });
+        }
+    };
+
+    const handleStartLiveSession = async (quiz) => {
+        try {
+            const session = await ensureSession(quiz);
+
+            enqueueSnackbar(
+                `Session started. Code: ${session.code}`,
+                { variant: 'success' }
+            );
+
+            navigate(`/host-room/${session.roomId}`);
         } catch (error) {
-            enqueueSnackbar(error.message || 'Could not delete quiz.', { variant: 'error' });
+            enqueueSnackbar(error.message, {
+                variant: 'error'
+            });
         }
     };
 
@@ -260,22 +362,44 @@ export default function QuizCatalog() {
                         <Typography variant="h4" sx={{ fontWeight: 700, mb: 1 }}>
                             Quiz Catalog
                         </Typography>
-                        <Typography variant="body1" color="text.secondary">
-                            Browse every saved quiz, sort it, duplicate it, delete it, or start a session.
+
+                        <Typography
+                            variant="body1"
+                            color="text.secondary"
+                        >
+                            Browse every saved quiz, sort it, duplicate it,
+                            delete it, or start a session.
                         </Typography>
                     </Box>
 
                     <Card variant="outlined" sx={{ borderRadius: 3 }}>
                         <CardContent>
                             <Stack spacing={2}>
-                                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} alignItems="center">
+                                <Stack
+                                    direction={{
+                                        xs: 'column',
+                                        sm: 'row'
+                                    }}
+                                    spacing={1}
+                                    alignItems="center"
+                                >
                                     <TextField
                                         fullWidth
                                         label="Search by name or creator"
                                         value={search}
-                                        onChange={(e) => setSearch(e.target.value)}
+                                        onChange={(e) =>
+                                            setSearch(e.target.value)
+                                        }
                                         InputProps={{
-                                            startAdornment: <SearchIcon sx={{ mr: 1, color: 'text.secondary' }} />
+                                            startAdornment: (
+                                                <SearchIcon
+                                                    sx={{
+                                                        mr: 1,
+                                                        color:
+                                                            'text.secondary'
+                                                    }}
+                                                />
+                                            )
                                         }}
                                     />
 
@@ -289,17 +413,67 @@ export default function QuizCatalog() {
                                     </Button>
                                 </Stack>
 
+                                <Stack direction="row" spacing={1}>
+                                    <Chip
+                                        label="My Quizzes"
+                                        clickable
+                                        variant={
+                                            scope === 'mine'
+                                                ? 'filled'
+                                                : 'outlined'
+                                        }
+                                        color={
+                                            scope === 'mine'
+                                                ? 'primary'
+                                                : 'default'
+                                        }
+                                        onClick={() =>
+                                            setScope('mine')
+                                        }
+                                    />
+
+                                    <Chip
+                                        label="All Quizzes"
+                                        clickable
+                                        variant={
+                                            scope === 'all'
+                                                ? 'filled'
+                                                : 'outlined'
+                                        }
+                                        color={
+                                            scope === 'all'
+                                                ? 'primary'
+                                                : 'default'
+                                        }
+                                        onClick={() =>
+                                            setScope('all')
+                                        }
+                                    />
+                                </Stack>
+
                                 <FormControl fullWidth size="small">
-                                    <InputLabel id="sort-by-label">Sort by</InputLabel>
+                                    <InputLabel>
+                                        Sort by
+                                    </InputLabel>
+
                                     <Select
-                                        labelId="sort-by-label"
-                                        label="Sort by"
                                         value={sortBy}
-                                        onChange={(e) => setSortBy(e.target.value)}
+                                        label="Sort by"
+                                        onChange={(e) =>
+                                            setSortBy(
+                                                e.target.value
+                                            )
+                                        }
                                     >
-                                        <MenuItem value="name">Name</MenuItem>
-                                        <MenuItem value="creator">Creator</MenuItem>
-                                        <MenuItem value="plays">Times played</MenuItem>
+                                        <MenuItem value="name">
+                                            Name
+                                        </MenuItem>
+                                        <MenuItem value="creator">
+                                            Creator
+                                        </MenuItem>
+                                        <MenuItem value="plays">
+                                            Times played
+                                        </MenuItem>
                                     </Select>
                                 </FormControl>
                             </Stack>
@@ -310,42 +484,87 @@ export default function QuizCatalog() {
 
                     <Stack spacing={2}>
                         {loading ? (
-                            <Card variant="outlined" sx={{ borderRadius: 3 }}>
+                            <Card
+                                variant="outlined"
+                                sx={{ borderRadius: 3 }}
+                            >
                                 <CardContent>
-                                    <Typography variant="body1">Loading quizzes...</Typography>
+                                    <Typography>
+                                        Loading quizzes...
+                                    </Typography>
                                 </CardContent>
                             </Card>
                         ) : filteredQuizzes.length === 0 ? (
-                            <Card variant="outlined" sx={{ borderRadius: 3 }}>
+                            <Card
+                                variant="outlined"
+                                sx={{ borderRadius: 3 }}
+                            >
                                 <CardContent>
-                                    <Typography variant="body1" color="text.secondary">
+                                    <Typography color="text.secondary">
                                         No quizzes found.
                                     </Typography>
                                 </CardContent>
                             </Card>
                         ) : (
                             filteredQuizzes.map((quiz) => {
-                                const session = sessionsByQuizId[quiz._id];
+                                const session =
+                                    sessionsByQuizId[
+                                    quiz._id
+                                    ];
 
                                 return (
-                                    <Card key={quiz._id} variant="outlined" sx={{ borderRadius: 3 }}>
+                                    <Card
+                                        key={quiz._id}
+                                        variant="outlined"
+                                        sx={{
+                                            borderRadius: 3
+                                        }}
+                                    >
                                         <CardContent>
                                             <Stack spacing={2}>
                                                 <Stack
-                                                    direction={{ xs: 'column', sm: 'row' }}
+                                                    direction={{
+                                                        xs: 'column',
+                                                        sm: 'row'
+                                                    }}
                                                     justifyContent="space-between"
-                                                    alignItems={{ xs: 'flex-start', sm: 'center' }}
-                                                    spacing={1}
+                                                    alignItems={{
+                                                        xs: 'flex-start',
+                                                        sm: 'center'
+                                                    }}
                                                 >
                                                     <Box>
-                                                        <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                                                            {quiz.quizName || 'Untitled Quiz'}
+                                                        <Typography
+                                                            variant="h6"
+                                                            sx={{
+                                                                fontWeight: 700
+                                                            }}
+                                                        >
+                                                            {
+                                                                quiz.quizName
+                                                            }
                                                         </Typography>
-                                                        <Typography variant="body2" color="text.secondary">
-                                                            Created by {quiz.createdByName || quiz.createdByUid || 'Anonymous'} • {formatDate(quiz.createdAt)}
+
+                                                        <Typography
+                                                            variant="body2"
+                                                            color="text.secondary"
+                                                        >
+                                                            Created by{' '}
+                                                            {quiz.createdByName ||
+                                                                quiz.createdByUid}{' '}
+                                                            •{' '}
+                                                            {formatDate(
+                                                                quiz.createdAt
+                                                            )}
                                                         </Typography>
-                                                        <Typography variant="body2" color="text.secondary">
-                                                            Times played: {quiz.timesPlayed || 0}
+
+                                                        <Typography
+                                                            variant="body2"
+                                                            color="text.secondary"
+                                                        >
+                                                            Times played:{' '}
+                                                            {quiz.timesPlayed ||
+                                                                0}
                                                         </Typography>
                                                     </Box>
 
@@ -355,93 +574,161 @@ export default function QuizCatalog() {
                                                     />
                                                 </Stack>
 
-                                                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} flexWrap="wrap">
+                                                <Stack
+                                                    direction={{
+                                                        xs: 'column',
+                                                        sm: 'row'
+                                                    }}
+                                                    spacing={1}
+                                                    flexWrap="wrap"
+                                                >
                                                     <Button
                                                         variant="contained"
-                                                        startIcon={<PlayArrowIcon />}
-                                                        onClick={async () => {
-                                                            const s = await ensureSession(quiz);
-                                                            enqueueSnackbar(`Session started. Code: ${s.code}`, { variant: 'success' });
-                                                        }}
+                                                        startIcon={
+                                                            <PlayArrowIcon />
+                                                        }
+                                                        onClick={() =>
+                                                            handleStartLiveSession(
+                                                                quiz
+                                                            )
+                                                        }
                                                     >
                                                         Start Session
                                                     </Button>
+
                                                     <Button
                                                         variant="outlined"
-                                                        startIcon={<ShareIcon />}
-                                                        onClick={() => handleNativeShare(quiz)}
+                                                        startIcon={
+                                                            <ShareIcon />
+                                                        }
+                                                        onClick={() =>
+                                                            handleNativeShare(
+                                                                quiz
+                                                            )
+                                                        }
                                                     >
                                                         Share
                                                     </Button>
+
                                                     <Button
                                                         variant="outlined"
-                                                        startIcon={<EditIcon />}
-                                                        onClick={() => handleEdit(quiz)}
+                                                        startIcon={
+                                                            <EditIcon />
+                                                        }
+                                                        onClick={() =>
+                                                            handleEdit(
+                                                                quiz
+                                                            )
+                                                        }
                                                     >
                                                         Edit
                                                     </Button>
+
                                                     <Button
                                                         variant="outlined"
-                                                        startIcon={<ContentCopyAllIcon />}
-                                                        onClick={() => handleDuplicate(quiz)}
+                                                        startIcon={
+                                                            <ContentCopyAllIcon />
+                                                        }
+                                                        onClick={() =>
+                                                            handleDuplicate(
+                                                                quiz
+                                                            )
+                                                        }
                                                     >
                                                         Copy Quiz
                                                     </Button>
+
                                                     <Button
                                                         color="error"
                                                         variant="outlined"
-                                                        startIcon={<DeleteIcon />}
-                                                        onClick={() => handleDelete(quiz)}
+                                                        startIcon={
+                                                            <DeleteIcon />
+                                                        }
+                                                        onClick={() =>
+                                                            handleDelete(
+                                                                quiz
+                                                            )
+                                                        }
                                                     >
                                                         Delete Quiz
                                                     </Button>
                                                 </Stack>
 
                                                 {session?.code ? (
-                                                    <Card variant="outlined" sx={{ borderRadius: 2, bgcolor: '#fbfbfd' }}>
+                                                    <Card
+                                                        variant="outlined"
+                                                        sx={{
+                                                            borderRadius: 2,
+                                                            bgcolor:
+                                                                '#fbfbfd'
+                                                        }}
+                                                    >
                                                         <CardContent>
                                                             <Stack spacing={2}>
-                                                                <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
+                                                                <Typography
+                                                                    variant="subtitle1"
+                                                                    sx={{
+                                                                        fontWeight: 700
+                                                                    }}
+                                                                >
                                                                     Session Code
                                                                 </Typography>
 
                                                                 <Typography
                                                                     variant="h4"
-                                                                    sx={{ fontWeight: 800, letterSpacing: 2, wordBreak: 'break-all' }}
+                                                                    sx={{
+                                                                        fontWeight: 800,
+                                                                        letterSpacing: 2
+                                                                    }}
                                                                 >
-                                                                    {session.code}
+                                                                    {
+                                                                        session.code
+                                                                    }
                                                                 </Typography>
 
-                                                                <Typography variant="body2" color="text.secondary">
-                                                                    Expires at: {formatDate(session.expiresAt)}
-                                                                </Typography>
+                                                                <Stack
+                                                                    direction="row"
+                                                                    spacing={1}
+                                                                    flexWrap="wrap"
+                                                                >
+                                                                    <Button
+                                                                        variant="outlined"
+                                                                        startIcon={
+                                                                            <ContentCopyIcon />
+                                                                        }
+                                                                        onClick={() =>
+                                                                            handleCopyCode(
+                                                                                quiz
+                                                                            )
+                                                                        }
+                                                                    >
+                                                                        Copy Code
+                                                                    </Button>
 
-                                                                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} flexWrap="wrap">
                                                                     <Button
                                                                         variant="outlined"
-                                                                        startIcon={<ContentCopyIcon />}
-                                                                        onClick={() => handleCopyCode(quiz)}
-                                                                    >
-                                                                        Copy code
-                                                                    </Button>
-                                                                    <Button
-                                                                        variant="outlined"
-                                                                        startIcon={<ShareIcon />}
-                                                                        onClick={() => handleNativeShare(quiz)}
-                                                                    >
-                                                                        Share
-                                                                    </Button>
-                                                                    <Button
-                                                                        variant="outlined"
-                                                                        startIcon={<MailOutlineIcon />}
-                                                                        onClick={() => handleEmailShare(quiz)}
+                                                                        startIcon={
+                                                                            <MailOutlineIcon />
+                                                                        }
+                                                                        onClick={() =>
+                                                                            handleEmailShare(
+                                                                                quiz
+                                                                            )
+                                                                        }
                                                                     >
                                                                         Email
                                                                     </Button>
+
                                                                     <Button
                                                                         variant="outlined"
-                                                                        startIcon={<WhatsAppIcon />}
-                                                                        onClick={() => handleWhatsAppShare(quiz)}
+                                                                        startIcon={
+                                                                            <WhatsAppIcon />
+                                                                        }
+                                                                        onClick={() =>
+                                                                            handleWhatsAppShare(
+                                                                                quiz
+                                                                            )
+                                                                        }
                                                                     >
                                                                         WhatsApp
                                                                     </Button>
