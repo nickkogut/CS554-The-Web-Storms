@@ -26,6 +26,12 @@ function HostRoom() {
     autoNextRef.current = autoNext;
   }, [autoNext]);
 
+  useEffect(() => {
+    const hostedRoomId = sessionStorage.getItem('hostedRoomId');
+    if (hostedRoomId !== roomId) {
+        navigate('/');
+    }
+  }, [roomId]);
   
 
   useEffect(() => {

@@ -2,7 +2,7 @@ import { gql } from '@apollo/client';
 import {auth} from "./src/firebase/FirebaseConfig.js";
 import client from './apolloClient.js';
 
-const authorizedRequest = async ({ query, variables = {}, type = "query" }) => {
+const authorizedRequest = async ({ query, variables = {}, type = "query", skipAuth = false }) => {
   /*
   Passes the current user as context for a graphql request.
 
@@ -21,18 +21,20 @@ const authorizedRequest = async ({ query, variables = {}, type = "query" }) => {
     variables: { friendId }
   });
   */
+  let headers = {};
+  if(!skipAuth){
+    if (!auth.currentUser) throw new Error("User not authenticated");
+    const token = await auth.currentUser.getIdToken();
+    headers.Authorization = `Bearer ${token}`;
+  }
 
-  if (!auth.currentUser) throw new Error("User not authenticated");
-  const token = await auth.currentUser.getIdToken();
 
   const parsed = gql`${query}`;
 
   const options = {
     variables,
     context: {
-      headers: {
-        Authorization: `Bearer ${token}`
-      }
+      headers
     }
   };
 

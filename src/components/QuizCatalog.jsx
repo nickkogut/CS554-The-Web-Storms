@@ -60,6 +60,7 @@ export default function QuizCatalog() {
         try {
             const result = await authorizedRequest({
                 type: 'query',
+                skipAuth: true,
                 query: `
                 query GetQuizCatalog {
                     getQuizCatalog {
@@ -340,7 +341,7 @@ export default function QuizCatalog() {
     const handleStartLiveSession = async (quiz) => {
         try {
             const session = await ensureSession(quiz);
-
+            sessionStorage.setItem('hostedRoomId', session.roomId);
             enqueueSnackbar(
                 `Session started. Code: ${session.code}`,
                 { variant: 'success' }
@@ -414,6 +415,7 @@ export default function QuizCatalog() {
                                 </Stack>
 
                                 <Stack direction="row" spacing={1}>
+                                    {auth.currentUser && 
                                     <Chip
                                         label="My Quizzes"
                                         clickable
@@ -430,7 +432,7 @@ export default function QuizCatalog() {
                                         onClick={() =>
                                             setScope('mine')
                                         }
-                                    />
+                                    />}
 
                                     <Chip
                                         label="All Quizzes"
