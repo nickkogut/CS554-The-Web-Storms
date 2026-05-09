@@ -46,7 +46,6 @@ function buildShareMessage(code, quizName) {
 export default function QuizCatalog() {
     const { enqueueSnackbar } = useSnackbar();
     const navigate = useNavigate();
-    const navigate = useNavigate();
 
     const [quizzes, setQuizzes] = useState([]);
     const [search, setSearch] = useState('');
@@ -174,7 +173,7 @@ export default function QuizCatalog() {
                                     : []
                     }))
                 },
-                (response) => {
+                async (response) => {
                     if (!response?.ok) {
                         reject(
                             new Error(
@@ -191,60 +190,15 @@ export default function QuizCatalog() {
                         expiresAt: null
                     };
 
-            const liveRoom = await createLiveRoom(quiz, session.code);
-
-            const enrichedSession = liveRoom
-                ? { ...session, roomId: liveRoom.roomId, pin: liveRoom.pin }
-                : session;
-
                     setSessionsByQuizId((prev) => ({
                         ...prev,
-                        [quiz._id]: enrichedSession
+                        [quiz._id]: session
                     }));
 
-                    resolve(enrichedSession);
+                    resolve(session);
                 }
             );
         });
-    };
-
-    const createLiveRoom = (quiz, code) => {
-        return new Promise((resolve) => {
-            if (!gameSocket.connected) {
-                gameSocket.connect();
-            }
-
-            const hostName = currentUser?.displayName || currentUser?.email || 'Host';
-
-            gameSocket.emit(
-                'create_room',
-                {
-                    hostName,
-                    quizId: quiz._id,
-                    code
-                },
-                (response) => {
-                    if (!response?.ok) {
-                        enqueueSnackbar(
-                            response?.error || 'Could not start the live room.',
-                            { variant: 'warning' }
-                        );
-                        resolve(null);
-                        return;
-                    }
-                    resolve(response);
-                }
-            );
-        });
-    };
-
-    const handleOpenHostRoom = (quiz) => {
-        const session = sessionsByQuizId[quiz._id];
-        if (!session?.roomId) {
-            enqueueSnackbar('Start the session first to open the host room.', { variant: 'info' });
-            return;
-        }
-        navigate(`/host-room/${session.roomId}`);
     };
 
     const ensureSession = async (quiz) => {
@@ -724,11 +678,6 @@ export default function QuizCatalog() {
                                                                     }
                                                                 </Typography>
 
-                                                                <Stack
-                                                                    direction="row"
-                                                                    spacing={1}
-                                                                    flexWrap="wrap"
-                                                                >
                                                                 <Typography variant="body2" color="text.secondary">
                                                                     Expires at: {formatDate(session.expiresAt)}
                                                                 </Typography>
@@ -746,19 +695,6 @@ export default function QuizCatalog() {
                                                                         variant="outlined"
                                                                         startIcon={<ContentCopyIcon />}
                                                                         onClick={() => handleCopyCode(quiz)}
-                                                                    >
-                                                                        Copy code
-                                                                    </Button>
-                                                                    <Button
-                                                                        variant="outlined"
-                                                                        startIcon={
-                                                                            <ContentCopyIcon />
-                                                                        }
-                                                                        onClick={() =>
-                                                                            handleCopyCode(
-                                                                                quiz
-                                                                            )
-                                                                        }
                                                                     >
                                                                         Copy Code
                                                                     </Button>

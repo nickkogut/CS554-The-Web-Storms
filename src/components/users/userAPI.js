@@ -218,44 +218,7 @@ userAPI.getGamesByUserId = async (id) => {
   });
 };
 
-userAPI.getUserById = async (id) => {
-  return publicRequest({
-    query: `
-      query GetUserById($id: String!){
-        getUserById(id: $id){
-          _id
-          name
-          email
-        }
-      }
-    `,
-    variables: { id }
-  });
-};
 
-userAPI.getGamesByUserId = async (id) => {
-  return publicRequest({
-    query: `
-      query GetGamesByUserId($id: String!){
-        getGamesUserById(id: $id){
-          roomId
-          quizName
-          pin
-          numPlayers
-          finishedAt
-          leaderboard {
-            rank
-            playerId
-            uid
-            name
-            score
-          }
-        }
-      }
-    `,
-    variables: { id }
-  });
-};
 
 
 export default userAPI;

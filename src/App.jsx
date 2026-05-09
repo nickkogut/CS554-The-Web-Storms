@@ -11,12 +11,9 @@ import Dashboard from './components/Dashboard.jsx';
 import JoinQuiz from './components/JoinQuiz.jsx';
 import ModeratorPage from './components/ModeratorPage';
 import HostQuiz from './components/HostQuiz.jsx';
-import HostRoom from './components/HostRoom.jsx';
-import PlayerRoom from './components/PlayerRoom.jsx';
 import Mailbox from './components/Mailbox.jsx';
 import WaitingRoomDemo from './components/WaitingRoomDemo';
 import WaitingRoom from './components/WaitingRoom.jsx';
-import HostRoom from './components/HostRoom.jsx';
 import PlayerGame from './components/PlayerGame.jsx';
 import Player from './components/Player.jsx';
 
@@ -37,16 +34,13 @@ function App() {
         
         <Route path='/join' element={<JoinQuiz />} />
         <Route path='/host' element={<HostQuiz />} />
-        <Route path='/host-room/:roomId' element={<HostRoom />} />
-        <Route path='/play-room/:roomId' element={<PlayerRoom />} />
 
         <Route path='/change-password' element={<PrivateRoute />} />
         <Route path='/change-password' element={<ChangePassword />} />
 
         <Route path='/search-quizzes' element={<QuizCatalog />} />
         <Route path='/waiting-demo' element={<WaitingRoomDemo />} />
-        <Route path='/play/:roomId' element = {<PlayerGame/>}/>
-        <Route path='/host-room/:roomId' element={<HostRoom/>}/>
+        <Route path='/play/:roomId' element={<PlayerGame />} />
 
         <Route path='/test-friends' element={<DEBUGfriends/>} />
 
