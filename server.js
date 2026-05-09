@@ -261,15 +261,6 @@ async function finishQuiz(io, room) {
     finishedAt: new Date().toISOString()
   };
 
-  try {
-    const gameCollection = await games();
-    await gameCollection.insertOne(payload);
-    console.log("Saved to completedQuizzes");
-  } catch (err) {
-    console.error("Mongo save failed:", err);
-  }
-
-
   publish(QUEUES.QUIZ_RESULT, {
     roomId: room.roomId,
     quizName: room.quizName,
