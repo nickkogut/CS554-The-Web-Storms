@@ -3,6 +3,8 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { useState, useContext, useEffect } from "react";
 import { gameSocket } from "../socket";
 import { AuthContext } from "../context/AuthContext";
+import { rules, validate } from '../utils/validation.js';
+
 
 function JoinQuiz() {
     const navigate = useNavigate();
@@ -29,6 +31,9 @@ function JoinQuiz() {
     const handleEnter = (e) => {
         e.preventDefault();
         if (!pin || !name) return;
+
+        const nameError = validate(name, [rules.minLength(2), rules.maxLength(30), rules.numbers]);
+        if (nameError) { setError(nameError); return; }
 
         setError("");
         setLoading(true);
