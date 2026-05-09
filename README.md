@@ -24,21 +24,21 @@ TODO
 # Getting Started
 ## Initial Setup
 Please start a docker engine (i.e. Docker Desktop) \
-```npm i```     (TODO: is this covered by docker already?) \
-```docker compose up --build``` 
+```npm i```\
+```npm run docker:dev``` 
 - This initializes Redis, RabbitMQ, and Mongo servers and enable them to communicate with the server and each other. This also starts the server.
 ```npm run seed``` *Note: if you create an account prior to this you will need to re-login* \
 ```https://localhost:5173/``` \
-```docker compose down```
+```npm run docker:down```
 
 ---
 2 premade accounts are supplied for your convenience. Please feel free to make your own accounts using email/password or Google.
 Main test user: \
-email: ```abc@def.ghi``` \
+email: ```test.user@quizquest.dev``` \
 pass:  ```TestPass123!```
 
-Secondary test user: \
-email: ```aaa@bbb.ccc``` \
+Secondary test user: You may log in as Kartik, Thomas, Nick, Praneeth, or Justin \
+email: ```<name>@quizquest.dev``` \
 pass:  ```TestPass123!```
 
 We suggest you use multiple browsers or private browsing tabs to sign in with multiple accounts at once to get the full multiplayer quiz experience!

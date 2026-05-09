@@ -38,6 +38,17 @@ services:
       rabbitmq:
         condition: service_healthy
     command: node src/workers/quizResultWorker.js        
+
+  seed:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    env_file: .env
+    depends_on:
+      - mongo
+    command: node tasks/seed.js
+    restart: "no"
+    profiles: ["seed"] 
   mongo:
     image: mongo
     ports:
