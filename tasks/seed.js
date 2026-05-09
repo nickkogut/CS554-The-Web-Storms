@@ -325,6 +325,7 @@ async function main() {
   const requests = [
     ['justin', 'kartik'],
     ['thomas', 'test'],
+    ['kartik', 'test'],
     ['praneeth', 'nick']
   ];
 
@@ -342,6 +343,48 @@ async function main() {
       },
       { upsert: true }
     );
+  }
+
+  /* FRIENDS */
+  const now = new Date();
+  const friends = [
+    ['justin', 'praneeth'],
+    ['justin', 'test'],
+    ['praneeth', 'test'],
+    ['nick', 'test']
+  ];
+
+  for (const [fromKey, toKey] of friends) {
+    const fromUser = identities[fromKey];
+    const toUser = identities[toKey];
+
+    await usersCol.updateOne(
+        {
+        _id: fromUser.uid, 
+        friends: {$not: {$elemMatch: {_id: toUser.uid}}}
+        },
+        {
+        $push: { friends: {
+            _id: toUser.uid,
+            name: toUser.displayName,
+            friendTimestamp: now,
+            lastInteracted: now
+        }}
+      });
+
+    await usersCol.updateOne(
+        {
+        _id: toUser.uid, 
+        friends: {$not: {$elemMatch: {_id: fromUser.uid}}}
+        },
+        {
+        $push: { friends: {
+            _id: fromUser.uid,
+            name: fromUser.displayName,
+            friendTimestamp: now,
+            lastInteracted: now
+        }}
+      });
   }
 
   /* QUIZZES */

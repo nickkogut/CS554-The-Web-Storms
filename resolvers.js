@@ -540,8 +540,8 @@ export const resolvers = {
 
     processFriendRequest: async (_, { friendId, accept }, context) => {
       requireUser(context);
-      await processFriendRequest(context.user.uid, friendId, accept);
-      return true;
+      const result = await processFriendRequest(context.user.uid, friendId, accept);
+      return result;
     }
   }
 };
