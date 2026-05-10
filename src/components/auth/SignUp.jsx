@@ -6,7 +6,6 @@ import {
   Typography,
   TextField,
   Button,
-  Stack,
   Divider,
   Alert
 } from '@mui/material';
@@ -50,11 +49,11 @@ function SignUp() {
   }
 
   return (
-    <Box sx={{ p: { xs: 2, md: 4 }, fontFamily: 'Gill Sans, sans-serif' }}>
-      <Box sx={{ maxWidth: 520, mx: 'auto' }}>
-        <Paper elevation={3} sx={{ p: 3 }}>
-          <Box sx={{ textAlign: 'center', mb: 3 }}>
-            <Typography variant="h2" fontWeight="bold" sx={{ mb: 1 }}>
+    <Box className="auth-page">
+      <Box className="auth-container auth-container--wide">
+        <Paper className="auth-card" elevation={3}>
+          <Box className="auth-header">
+            <Typography variant="h2" fontWeight="bold">
               ✨ Create Account
             </Typography>
             <Typography variant="body2" color="text.secondary">
@@ -62,10 +61,10 @@ function SignUp() {
             </Typography>
           </Box>
 
-          <Divider sx={{ mb: 3 }} />
+          <Divider className="auth-divider-spaced" />
 
           <Box component="form" onSubmit={handleSignUp} noValidate>
-            <Stack spacing={2}>
+            <Box className="auth-form-fields">
               <TextField
                 name="username"
                 id="username"
@@ -118,21 +117,16 @@ function SignUp() {
                 Create a New Account
               </Button>
 
-              <Button
-                component={RouterLink}
-                to="/login"
-                variant="outlined"
-                fullWidth
-              >
+              <Button component={RouterLink} to="/login" variant="outlined" fullWidth>
                 Log in Instead
               </Button>
 
-              <Divider sx={{ my: 1 }}>or</Divider>
+              <Divider>or</Divider>
 
-              <Box sx={{ display: 'flex', justifyContent: 'center' }}>
+              <Box className="auth-google-row">
                 <GoogleLogin setError={setError} />
               </Box>
-            </Stack>
+            </Box>
           </Box>
         </Paper>
       </Box>

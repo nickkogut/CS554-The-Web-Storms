@@ -6,15 +6,14 @@ import {
   Typography,
   TextField,
   Button,
-  Stack,
   Divider,
-  Alert,
-  Link as MuiLink
+  Alert
 } from '@mui/material';
 import GoogleLogin from './GoogleLogin';
 import { AuthContext } from '../../context/AuthContext';
 import { checkEmail, checkPassword, setFBError } from './authHelpers.js';
 import { loginEmail, resetPassword } from '../../firebase/FirebaseFunctions';
+import './auth.css';
 
 function Login() {
   const { currentUser } = useContext(AuthContext);
@@ -63,11 +62,11 @@ function Login() {
   }
 
   return (
-    <Box sx={{ p: { xs: 2, md: 4 }, fontFamily: 'Gill Sans, sans-serif' }}>
-      <Box sx={{ maxWidth: 480, mx: 'auto' }}>
-        <Paper elevation={3} sx={{ p: 3 }}>
-          <Box sx={{ textAlign: 'center', mb: 3 }}>
-            <Typography variant="h2" fontWeight="bold" sx={{ mb: 1 }}>
+    <Box className="auth-page">
+      <Box className="auth-container">
+        <Paper className="auth-card" elevation={3}>
+          <Box className="auth-header">
+            <Typography variant="h2" fontWeight="bold">
               🔐 Login
             </Typography>
             <Typography variant="body2" color="text.secondary">
@@ -75,10 +74,10 @@ function Login() {
             </Typography>
           </Box>
 
-          <Divider sx={{ mb: 3 }} />
+          <Divider className="auth-divider-spaced" />
 
           <Box component="form" onSubmit={handleLogin} noValidate>
-            <Stack spacing={2}>
+            <Box className="auth-form-fields">
               <TextField
                 name="email"
                 id="email"
@@ -104,31 +103,21 @@ function Login() {
                 Login
               </Button>
 
-              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
-                <Button
-                  type="button"
-                  variant="outlined"
-                  fullWidth
-                  onClick={handleResetPassword}
-                >
+              <Box className="auth-button-row">
+                <Button type="button" variant="outlined" onClick={handleResetPassword}>
                   Forgot Password
                 </Button>
-                <Button
-                  component={RouterLink}
-                  to="/signup"
-                  variant="outlined"
-                  fullWidth
-                >
+                <Button component={RouterLink} to="/signup" variant="outlined">
                   Create Account
                 </Button>
-              </Stack>
+              </Box>
 
-              <Divider sx={{ my: 1 }}>or</Divider>
+              <Divider>or</Divider>
 
-              <Box sx={{ display: 'flex', justifyContent: 'center' }}>
+              <Box className="auth-google-row">
                 <GoogleLogin setError={setError} />
               </Box>
-            </Stack>
+            </Box>
           </Box>
         </Paper>
       </Box>

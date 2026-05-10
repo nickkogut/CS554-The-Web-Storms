@@ -6,7 +6,6 @@ import {
   Typography,
   TextField,
   Button,
-  Stack,
   Divider,
   Alert
 } from '@mui/material';
@@ -53,11 +52,11 @@ function ChangePassword() {
   const usingPasswordProvider = currentUser.providerData[0].providerId === 'password';
 
   return (
-    <Box sx={{ p: { xs: 2, md: 4 }, fontFamily: 'Gill Sans, sans-serif' }}>
-      <Box sx={{ maxWidth: 480, mx: 'auto' }}>
-        <Paper elevation={3} sx={{ p: 3 }}>
-          <Box sx={{ textAlign: 'center', mb: 3 }}>
-            <Typography variant="h2" fontWeight="bold" sx={{ mb: 1 }}>
+    <Box className="auth-page">
+      <Box className="auth-container">
+        <Paper className="auth-card" elevation={3}>
+          <Box className="auth-header">
+            <Typography variant="h2" fontWeight="bold">
               🔒 Change Password
             </Typography>
             {usingPasswordProvider ? (
@@ -67,7 +66,7 @@ function ChangePassword() {
             ) : null}
           </Box>
 
-          <Divider sx={{ mb: 3 }} />
+          <Divider className="auth-divider-spaced" />
 
           {!usingPasswordProvider ? (
             <Alert severity="info">
@@ -76,7 +75,7 @@ function ChangePassword() {
             </Alert>
           ) : (
             <Box component="form" onSubmit={handleChangePassword} noValidate>
-              <Stack spacing={2}>
+              <Box className="auth-form-fields">
                 <TextField
                   name="oldPassword"
                   id="oldPassword"
@@ -110,7 +109,7 @@ function ChangePassword() {
                 <Button type="submit" variant="contained" size="large" fullWidth>
                   Change Password
                 </Button>
-              </Stack>
+              </Box>
             </Box>
           )}
         </Paper>
