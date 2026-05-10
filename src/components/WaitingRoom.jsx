@@ -102,7 +102,7 @@ export default function WaitingRoom({
         if(!auth?.currentUser?.uid) return;
         const res = await userAPI.friend.get();
         const list = res?.data?.getFriendsForUser || [];
-        if(mounted) setFriendIds(new Set(list.map(f => f._id)));
+        if(mounted) setFriendIds(new Set(list.map(f => f._id || f.uid || f.id)));
       }catch(e){
         console.error('could not load friends', e);
       }
@@ -117,15 +117,31 @@ export default function WaitingRoom({
       <Box sx={{ width: 320 }}>
         <Typography variant="h6">Player Answers</Typography>
         <Box sx={{ maxHeight: 360, overflow: 'auto', mt: 1 }}>
-          { (players || []).map(p => (
-            <Box key={p.id} sx={{ display: 'flex', alignItems: 'center', gap: 1, py: 1, borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
-              <Box sx={{ width: 36, height:36, borderRadius: '50%', bgcolor: p.answered ? 'success.main' : (mode === 'question' ? 'error.main' : 'grey.400'), display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white' }}>{p.name?.charAt(0) ?? '?'}</Box>
-              <Box>
-                <Typography variant="body1">{p.name || 'Anonymous'}</Typography>
-                <Typography variant="caption">{mode === 'question' ? (p.answered ? 'Answered' : 'Not answered') : ''}</Typography>
+          { (players || []).map(p => {
+            const friendId = p.uid || p.playerId || p._id || p.id;
+            const canAdd = auth?.currentUser?.uid && friendId && friendId !== auth.currentUser.uid && !friendIds.has(friendId);
+            return (
+              <Box key={p.id ?? friendId ?? JSON.stringify(p)} sx={{ display: 'flex', alignItems: 'center', gap: 1, py: 1, borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
+                <Box sx={{ width: 36, height:36, borderRadius: '50%', bgcolor: p.answered ? 'success.main' : (mode === 'question' ? 'error.main' : 'grey.400'), display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white' }}>{p.name?.charAt(0) ?? '?'}</Box>
+                <Box sx={{ flex: 1 }}>
+                  <Typography variant="body1">{p.name || 'Anonymous'}</Typography>
+                  <Typography variant="caption">{mode === 'question' ? (p.answered ? 'Answered' : 'Not answered') : ''}</Typography>
+                </Box>
+                <Box>
+                  {canAdd ? (
+                    <Button size="small" variant="outlined" onClick={async () => {
+                      try{
+                        gameSocket.emit("sendFriendRequest", {uid: auth.currentUser.uid, friendId});
+                        setFriendIds(s => new Set([...Array.from(s), friendId]));
+                      }catch(e){
+                        console.error('friend request failed', e);
+                      }
+                    }}>Add Friend</Button>
+                  ) : null}
+                </Box>
               </Box>
-            </Box>
-          )) }
+            );
+          }) }
         </Box>
       </Box>
     );

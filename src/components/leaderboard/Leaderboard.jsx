@@ -107,7 +107,7 @@ export default function Leaderboard() {
         if (!auth?.currentUser?.uid) return;
         const res = await userAPI.friend.get();
         const list = res?.data?.getFriendsForUser || [];
-        if (mounted) setFriendIds(new Set(list.map((f) => f._id)));
+        if (mounted) setFriendIds(new Set(list.map((f) => f._id || f.uid || f.id)));
       } catch (e) {
         console.error('could not load friends', e);
       }
