@@ -221,7 +221,7 @@ export default function Player(){
                             </Typography>
                         ) : (
                             <Stack spacing={2}>
-                                {games.map((game, index) => {
+                                {[...games].reverse().map((game, index) => {
                                     const playerEntry = game.leaderboard?.find((p) => p.uid === id);
                                     if(!playerEntry) return null;
 
