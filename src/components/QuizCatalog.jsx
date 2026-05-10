@@ -60,6 +60,7 @@ export default function QuizCatalog() {
         try {
             const result = await authorizedRequest({
                 type: 'query',
+                skipAuth: true,
                 query: `
                 query GetQuizCatalog {
                     getQuizCatalog {
@@ -173,7 +174,7 @@ export default function QuizCatalog() {
                                     : []
                     }))
                 },
-                (response) => {
+                async (response) => {
                     if (!response?.ok) {
                         reject(
                             new Error(
@@ -340,7 +341,7 @@ export default function QuizCatalog() {
     const handleStartLiveSession = async (quiz) => {
         try {
             const session = await ensureSession(quiz);
-
+            sessionStorage.setItem('hostedRoomId', session.roomId);
             enqueueSnackbar(
                 `Session started. Code: ${session.code}`,
                 { variant: 'success' }
@@ -414,6 +415,7 @@ export default function QuizCatalog() {
                                 </Stack>
 
                                 <Stack direction="row" spacing={1}>
+                                    {auth.currentUser && 
                                     <Chip
                                         label="My Quizzes"
                                         clickable
@@ -430,7 +432,7 @@ export default function QuizCatalog() {
                                         onClick={() =>
                                             setScope('mine')
                                         }
-                                    />
+                                    />}
 
                                     <Chip
                                         label="All Quizzes"
@@ -678,21 +680,23 @@ export default function QuizCatalog() {
                                                                     }
                                                                 </Typography>
 
-                                                                <Stack
-                                                                    direction="row"
-                                                                    spacing={1}
-                                                                    flexWrap="wrap"
-                                                                >
+                                                                <Typography variant="body2" color="text.secondary">
+                                                                    Expires at: {formatDate(session.expiresAt)}
+                                                                </Typography>
+
+                                                                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} flexWrap="wrap">
+                                                                    <Button
+                                                                        variant="contained"
+                                                                        startIcon={<MeetingRoomIcon />}
+                                                                        onClick={() => handleOpenHostRoom(quiz)}
+                                                                        disabled={!session?.roomId}
+                                                                    >
+                                                                        Open Host Room
+                                                                    </Button>
                                                                     <Button
                                                                         variant="outlined"
-                                                                        startIcon={
-                                                                            <ContentCopyIcon />
-                                                                        }
-                                                                        onClick={() =>
-                                                                            handleCopyCode(
-                                                                                quiz
-                                                                            )
-                                                                        }
+                                                                        startIcon={<ContentCopyIcon />}
+                                                                        onClick={() => handleCopyCode(quiz)}
                                                                     >
                                                                         Copy Code
                                                                     </Button>

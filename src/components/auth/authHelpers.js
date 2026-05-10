@@ -23,6 +23,7 @@ export const checkPassword = (password) => {
 export const checkUsername = (username) => {
     // Throws if username has an invalid format. Returns the trimmed username.
     username = checkString(username, "username");
+    if (/^\d+$/.test(username)) throw "Error: username cannot consist of only numbers";
     if (username.length < 6 || username.length > 30) throw "Error: username must be between 6 and 30 characters long";
     return username;
 }
