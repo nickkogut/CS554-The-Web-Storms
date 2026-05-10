@@ -3,11 +3,12 @@ import { startStandaloneServer } from '@apollo/server/standalone';
 import { Server } from 'socket.io';
 import crypto from 'crypto';
 import { createServer } from 'http';
+import { ObjectId } from 'mongodb';
 
 import { typeDefs } from './typeDefs.js';
 import { resolvers } from './resolvers.js';
 import { connectRedis } from './config/redisClient.js';
-import { questions as questionCollection } from './config/mongoCollections.js';
+import { questions as questionCollection, quizzes as quizCollection } from './config/mongoCollections.js';
 import { games } from './config/mongoCollections.js';
 import admin from './src/firebase/FirebaseAdmin.js';
 import { getUser } from './src/components/users/users.js';
@@ -103,6 +104,20 @@ function createPin() {
     pin = String(Math.floor(100000 + Math.random() * 900000));
   } while (pinToRoomId.has(pin));
   return pin;
+}
+
+function acquirePin(requestedCode){
+  if(requestedCode === undefined || requestedCode === null || requestedCode === ''){
+    return createPin();
+  }
+  const trimmed = String(requestedCode).trim().toUpperCase();
+  if(!trimmed){
+    return createPin();
+  }
+  if(pinToRoomId.has(trimmed)){
+    throw new Error('A live room already exists for that code');
+  }
+  return trimmed;
 }
 
 function ensureString(value, fieldName) {
@@ -235,6 +250,31 @@ async function getRecentQuestions(limit = DEFAULT_QUESTION_COUNT) {
         ? doc.correctOptions
         : (Number.isInteger(doc.correctOption) ? [doc.correctOption] : []),
       createdAt: doc.createdAt
+    };
+  });
+}
+
+async function getQuestionsForQuiz(quizId){
+  let objectId;
+  try{
+    objectId = new ObjectId(quizId);
+  }
+  catch(e){
+    throw new Error('quizId must be a valid quiz id');
+  }
+  const col = await quizCollection();
+  const quiz = await col.findOne({ _id: objectId });
+  if(!quiz){
+    throw new Error('Quiz not found');
+  }
+  if(!Array.isArray(quiz.questions) || quiz.questions.length === 0){
+    throw new Error('Quiz has no questions');
+  }
+  return quiz.questions.map((q) => {
+    return {
+      questionText: q.questionText,
+      options: q.options,
+      correctOption: q.correctOption
     };
   });
 }
@@ -499,8 +539,59 @@ io.on('connection', (socket) => {
       error: e.message || 'Unable to create room'
     });
   }
-});
 
+    try{
+      const hostName = ensureString(payload?.hostName || 'Host', 'Host name');
+      const requestedCount = Number(payload?.questionCount || DEFAULT_QUESTION_COUNT);
+      const questionCount = Number.isInteger(requestedCount) && requestedCount > 0 ? requestedCount : DEFAULT_QUESTION_COUNT;
+
+      let questions;
+      if(payload?.quizId){
+        questions = await getQuestionsForQuiz(payload.quizId);
+      }
+      else{
+        questions = await getRecentQuestions(questionCount);
+      }
+
+      if(!questions.length){
+        throw new Error('No questions found. Please create questions first.');
+      }
+      const roomId = createRoomId();
+      const pin = acquirePin(payload?.code);
+      const room = {
+        roomId,
+        pin,
+        hostSocketId: socket.id,
+        hostName,
+        status: 'lobby',
+        questions,
+        currentQuestionIndex: -1,
+        questionEndsAt: null,
+        latestQuestionResult: null,
+        answers: new Map(),
+        players: new Map(),
+        timer: null
+      };
+      rooms.set(roomId, room);
+      pinToRoomId.set(pin, roomId);
+      socket.join(roomId);
+      storeSocketMeta(socket.id, { roomId, role: 'host' });
+      emitRoomSnapshot(io, room);
+      callback?.({
+        ok: true,
+        roomId,
+        pin,
+        totalQuestions: questions.length
+      });
+    }
+    catch(e){
+      callback?.({
+        ok: false,
+        error: e.message || 'Unable to create room'
+      });
+    }
+  });
+  
   socket.on('watch_room', (payload, callback) => {
     try {
       const roomId = ensureString(payload?.roomId, 'Room ID');

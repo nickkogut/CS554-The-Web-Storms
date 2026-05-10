@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { gameSocket } from "../socket.js";
-import { Typography, Box, Button, TableContainer, TableCell, TableHead, TableRow, TableBody, Alert, Paper, Table, FormGroup, Checkbox, FormControlLabel } from "@mui/material";
+import { Typography, Box, Button, TableContainer, TableCell, TableHead, TableRow, TableBody, Alert, Paper, Table, FormGroup, Checkbox, FormControlLabel, Stack, Avatar, Chip, Divider } from "@mui/material";
 import { auth } from "../firebase/FirebaseConfig";
 import WaitingRoom from "./WaitingRoom.jsx";
 
@@ -214,7 +214,7 @@ function HostRoom() {
         )}
       </Box>
 
-      {question ? (
+      {question && !finalResult ? (
         <Box>
           <Typography variant="h3">
             Question {question.questionIndex + 1} of {question.totalQuestions}
@@ -231,7 +231,7 @@ function HostRoom() {
         </Box>
       ) : null}
 
-      {room?.players?.length ? (
+      {room?.players?.length && !finalResult ? (
         <Box>
           <Typography variant="h3">Players</Typography>
 
@@ -251,7 +251,7 @@ function HostRoom() {
         </Box>
       ) : null}
 
-      {questionClosed ? (
+      {questionClosed && !finalResult ? (
         <Box>
           <Typography variant="h3">Round Result</Typography>
           <Typography variant="body1">
@@ -279,6 +279,148 @@ function HostRoom() {
             </TableContainer>
           </Box>
         </Box>
+      ) : null}
+
+      {room?.leaderboard?.length && !finalResult ? (
+        <Paper elevation={2} sx={{ p: 3, mt: 3, fontFamily: "Gill Sans, sans-serif" }}>
+          <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
+            <Typography variant="h5" fontWeight="bold">Leaderboard</Typography>
+            <Chip label={`${room.leaderboard.length} players`} color="primary" size="small" />
+          </Stack>
+          <Divider sx={{ mb: 2 }} />
+
+          <Stack spacing={1.5}>
+            {room.leaderboard.map((player) => {
+              const rankColor =
+                player.rank === 1 ? "#FFD700" :
+                player.rank === 2 ? "#C0C0C0" :
+                player.rank === 3 ? "#CD7F32" : null;
+              const initials = (player.name || "?").trim().split(/\s+/).map(p => p[0]).slice(0, 2).join("").toUpperCase();
+
+              return (
+                <Paper
+                  key={player.playerId}
+                  variant="outlined"
+                  sx={{
+                    p: 1.5,
+                    borderLeft: 4,
+                    borderLeftColor: rankColor || "primary.main"
+                  }}
+                >
+                  <Stack direction="row" alignItems="center" spacing={2}>
+                    <Box sx={{ minWidth: 44, textAlign: "center" }}>
+                      <Typography variant="h5" fontWeight="bold" sx={{ color: rankColor || "text.primary" }}>
+                        #{player.rank}
+                      </Typography>
+                    </Box>
+                    <Avatar sx={{ bgcolor: "primary.main" }}>
+                      {initials}
+                    </Avatar>
+                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                      <Typography variant="subtitle1" fontWeight="bold" noWrap>
+                        {player.name}
+                      </Typography>
+                    </Box>
+                    <Box sx={{ textAlign: "right", minWidth: 70 }}>
+                      <Typography variant="h6" fontWeight="bold" color="primary">
+                        {player.score}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        points
+                      </Typography>
+                    </Box>
+                  </Stack>
+                </Paper>
+              );
+            })}
+          </Stack>
+        </Paper>
+      ) : null}
+
+      {finalResult ? (
+        <Paper elevation={3} sx={{ p: 3, mt: 3, fontFamily: "Gill Sans, sans-serif" }}>
+          {(() => {
+            const board = finalResult.leaderboard || room?.leaderboard || [];
+            const winner = board.find((p) => p.rank === 1) || board[0];
+
+            return (
+              <>
+                <Box sx={{ textAlign: "center", mb: 3 }}>
+                  <Typography variant="h2" fontWeight="bold" sx={{ mb: 1 }}>
+                    🏆 Quiz Finished!
+                  </Typography>
+                  {winner ? (
+                    <Typography variant="h6" color="text.secondary">
+                      Winner: <strong style={{ color: "#FFD700" }}>{winner.name}</strong> with {winner.score} points
+                    </Typography>
+                  ) : null}
+                </Box>
+
+                <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
+                  <Typography variant="h5" fontWeight="bold">Final Standings</Typography>
+                  <Chip label={`${board.length} players`} color="primary" size="small" />
+                </Stack>
+                <Divider sx={{ mb: 2 }} />
+
+                <Stack spacing={1.5}>
+                  {board.map((player) => {
+                    const rankColor =
+                      player.rank === 1 ? "#FFD700" :
+                      player.rank === 2 ? "#C0C0C0" :
+                      player.rank === 3 ? "#CD7F32" : null;
+                    const isPodium = player.rank <= 3;
+                    const initials = (player.name || "?").trim().split(/\s+/).map(p => p[0]).slice(0, 2).join("").toUpperCase();
+
+                    return (
+                      <Paper
+                        key={player.playerId}
+                        variant="outlined"
+                        sx={{
+                          p: isPodium ? 2 : 1.5,
+                          borderLeft: 4,
+                          borderLeftColor: rankColor || "primary.main"
+                        }}
+                      >
+                        <Stack direction="row" alignItems="center" spacing={2}>
+                          <Box sx={{ minWidth: 60, textAlign: "center" }}>
+                            <Typography variant={isPodium ? "h4" : "h5"} fontWeight="bold" sx={{ color: rankColor || "text.primary" }}>
+                              {player.rank === 1 ? "🥇" : player.rank === 2 ? "🥈" : player.rank === 3 ? "🥉" : `#${player.rank}`}
+                            </Typography>
+                          </Box>
+                          <Avatar sx={{ width: isPodium ? 48 : 40, height: isPodium ? 48 : 40, bgcolor: "primary.main" }}>
+                            {initials}
+                          </Avatar>
+                          <Box sx={{ flex: 1, minWidth: 0 }}>
+                            <Typography variant={isPodium ? "h6" : "subtitle1"} fontWeight="bold" noWrap>
+                              {player.name}
+                            </Typography>
+                          </Box>
+                          <Box sx={{ textAlign: "right", minWidth: 80 }}>
+                            <Typography variant={isPodium ? "h5" : "h6"} fontWeight="bold" color="primary">
+                              {player.score}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              points
+                            </Typography>
+                          </Box>
+                        </Stack>
+                      </Paper>
+                    );
+                  })}
+                </Stack>
+
+                <Box sx={{ mt: 3, display: "flex", justifyContent: "center", gap: 2 }}>
+                  <Button variant="contained" onClick={() => navigate("/")}>
+                    Back to Home
+                  </Button>
+                  <Button variant="outlined" onClick={goToLeaderboard}>
+                    Open Full Leaderboard
+                  </Button>
+                </Box>
+              </>
+            );
+          })()}
+        </Paper>
       ) : null}
     </Box>
   );

@@ -173,7 +173,7 @@ export default function QuizCatalog() {
                                     : []
                     }))
                 },
-                (response) => {
+                async (response) => {
                     if (!response?.ok) {
                         reject(
                             new Error(
@@ -678,21 +678,23 @@ export default function QuizCatalog() {
                                                                     }
                                                                 </Typography>
 
-                                                                <Stack
-                                                                    direction="row"
-                                                                    spacing={1}
-                                                                    flexWrap="wrap"
-                                                                >
+                                                                <Typography variant="body2" color="text.secondary">
+                                                                    Expires at: {formatDate(session.expiresAt)}
+                                                                </Typography>
+
+                                                                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} flexWrap="wrap">
+                                                                    <Button
+                                                                        variant="contained"
+                                                                        startIcon={<MeetingRoomIcon />}
+                                                                        onClick={() => handleOpenHostRoom(quiz)}
+                                                                        disabled={!session?.roomId}
+                                                                    >
+                                                                        Open Host Room
+                                                                    </Button>
                                                                     <Button
                                                                         variant="outlined"
-                                                                        startIcon={
-                                                                            <ContentCopyIcon />
-                                                                        }
-                                                                        onClick={() =>
-                                                                            handleCopyCode(
-                                                                                quiz
-                                                                            )
-                                                                        }
+                                                                        startIcon={<ContentCopyIcon />}
+                                                                        onClick={() => handleCopyCode(quiz)}
                                                                     >
                                                                         Copy Code
                                                                     </Button>

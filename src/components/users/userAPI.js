@@ -181,6 +181,12 @@ userAPI.getUserById = async (id) => {
           _id
           name
           email
+          friends {
+            _id
+            name
+            friendTimestamp
+            lastInteracted
+          }
         }
       }
     `,
@@ -211,6 +217,8 @@ userAPI.getGamesByUserId = async (id) => {
     variables: { id }
   });
 };
+
+
 
 
 export default userAPI;
