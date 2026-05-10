@@ -314,6 +314,7 @@ export const Mailbox = () => {
           borderStyle: 'solid',
           borderWidth: '1px',
           borderRadius: '8px',
+          backgroundColor: "white",
         }}>
           
           {friendRequests.length > 0 && (
