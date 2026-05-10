@@ -23,6 +23,7 @@ import Checkbox from '@mui/material/Checkbox';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import SendIcon from '@mui/icons-material/Send';
+import { rules, validate } from '../utils/validation.js';
 
 function createBlankQuestion() {
     return {
@@ -104,18 +105,24 @@ export default function ModeratorPage() {
     };
 
     const validateQuestions = () => {
+        const nameError = validate(quizName, [rules.minLength(3), rules.maxLength(100), rules.numbers]);
+        if(nameError) throw new Error(`Quiz Name: ${nameError}`);
         if (!quizName.trim()) {
             throw new Error('Quiz name cannot be empty.');
         }
 
         for (let i = 0; i < questions.length; i += 1) {
             const q = questions[i];
+            const questionError = validate(q.questionText, [rules.minLength(5), rules.maxLength(300), rules.numbers]);
+            if (questionError) throw new Error(`Question ${i + 1}: ${questionError}`);
 
             if (!q.questionText.trim()) {
                 throw new Error(`Question ${i + 1} cannot be empty.`);
             }
 
             for (let j = 0; j < q.options.length; j += 1) {
+                const optionError = validate(q.options[j], [rules.maxLength(150)]);
+                if (optionError) throw new Error(`Option ${j + 1} in Question ${i + 1}: ${optionError}`);
                 if (!q.options[j].trim()) {
                     throw new Error(`Option ${j + 1} in Question ${i + 1} cannot be empty.`);
                 }
