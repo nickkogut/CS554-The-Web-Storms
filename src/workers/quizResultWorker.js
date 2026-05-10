@@ -26,5 +26,11 @@ export async function startUp(){
             console.error('Error with rabbit worker:', e);
             channel.nack(msg, false, false);
         }
-    })
+    });
+    await new Promise(() => {});
 }
+
+startUp().catch((e) => {
+    console.error('Worker failed:', e);
+    process.exit(1);
+});
