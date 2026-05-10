@@ -25,9 +25,14 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import SendIcon from '@mui/icons-material/Send';
 import { rules, validate } from '../utils/validation.js';
 
+function generateID(){
+    if(crypto?.randomUUID()) return crypto.randomUUID();
+    return Math.random().toString(36).slice(2) + Date.now().toString(36);
+}
+
 function createBlankQuestion() {
     return {
-        id: crypto.randomUUID(),
+        id: crypto.generateID(),
         questionText: '',
         options: ['', '', '', ''],
         correctOptions: [0]
@@ -165,7 +170,7 @@ export default function ModeratorPage() {
                 setQuizName(quiz.quizName || '');
                 setQuestions(
                     (quiz.questions || []).map((q) => ({
-                        id: crypto.randomUUID(),
+                        id: crypto.generateID(),
                         questionText: q.questionText || '',
                         options: q.options || ['', '', '', ''],
                         correctOptions: Array.isArray(q.correctOptions) ? q.correctOptions : []

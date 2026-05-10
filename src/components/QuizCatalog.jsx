@@ -30,6 +30,7 @@ import EditIcon from '@mui/icons-material/Edit';
 import ContentCopyAllIcon from '@mui/icons-material/ContentCopy';
 import DeleteIcon from '@mui/icons-material/Delete';
 import RefreshIcon from '@mui/icons-material/Refresh';
+import MeetingRoomIcon from '@mui/icons-material/MeetingRoom';
 
 function formatDate(value) {
     if (!value) return '—';
@@ -208,6 +209,29 @@ export default function QuizCatalog() {
         return startSession(quiz);
     };
 
+    const handleOpenHostRoom = async (quiz) => {
+        try {
+            const session = await ensureSession(quiz);
+
+            if (!session?.roomId) {
+                enqueueSnackbar('No active room found.', {
+                    variant: 'error'
+                });
+                return;
+            }
+
+            sessionStorage.setItem('hostedRoomId', session.roomId);
+
+            navigate(`/host-room/${session.roomId}`);
+        } catch (error) {
+            enqueueSnackbar(
+                error.message || 'Could not open host room.',
+                {
+                    variant: 'error'
+                }
+            );
+        }
+    };
     const handleCopyCode = async (quiz) => {
         try {
             const session = await ensureSession(quiz);
