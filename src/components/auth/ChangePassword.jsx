@@ -1,26 +1,37 @@
-import React, {useContext, useState} from 'react';
-import {AuthContext} from '../../context/AuthContext';
-import {checkPassword, setFBError} from "./authHelpers.js";
-import {changePassword} from '../../firebase/FirebaseFunctions';
-import './auth.css';
+import React, { useContext, useState } from 'react';
 import { Navigate } from 'react-router-dom';
+import {
+  Box,
+  Paper,
+  Typography,
+  TextField,
+  Button,
+  Divider,
+  Alert
+} from '@mui/material';
+import { AuthContext } from '../../context/AuthContext';
+import { checkPassword, setFBError } from './authHelpers.js';
+import { changePassword } from '../../firebase/FirebaseFunctions';
+import './auth.css';
 
 function ChangePassword() {
-  const {currentUser} = useContext(AuthContext);
-  const [error, setError] = useState("");
+  const { currentUser } = useContext(AuthContext);
+  const [error, setError] = useState('');
+  const [info, setInfo] = useState('');
 
   const handleChangePassword = async (ev) => {
     ev.preventDefault();
-    let {oldPassword, newPassword, confirmNewPassword} = ev.target.elements;
+    setError('');
+    setInfo('');
+    let { oldPassword, newPassword, confirmNewPassword } = ev.target.elements;
     let email = currentUser.email;
     try {
-        oldPassword = checkPassword(oldPassword.value);
-        newPassword = checkPassword(newPassword.value)
-        confirmNewPassword = checkPassword(newPassword.value)
+      oldPassword = checkPassword(oldPassword.value);
+      newPassword = checkPassword(newPassword.value);
+      confirmNewPassword = checkPassword(confirmNewPassword.value);
 
-        if (newPassword === oldPassword) throw "Error: new password cannot be the same as the old password";
-        if (newPassword !== confirmNewPassword) throw "Error: new passwords do not match";
-
+      if (newPassword === oldPassword) throw 'Error: new password cannot be the same as the old password';
+      if (newPassword !== confirmNewPassword) throw 'Error: new passwords do not match';
     } catch (e) {
       setError(e);
       return false;
@@ -28,44 +39,83 @@ function ChangePassword() {
 
     try {
       await changePassword(email, oldPassword, newPassword);
+      setInfo('Password updated successfully.');
     } catch (e) {
       setFBError(e, setError);
     }
   };
 
   if (!currentUser) {
-    return (
-      <Navigate to="/login" />
-    );
-  } else if (currentUser.providerData[0].providerId !== 'password') {
-    return (
-      <>
-        <h1>Change Password</h1>
-        <p className="auth-error">You are currently signed in using {currentUser.providerData[0].providerId}. Please change your password there.</p>
-      </>
-    );
-    } else {
-    return (
-        <>
-            <h1>Change Password</h1>
-            <form className="auth-form" onSubmit={handleChangePassword}>
-                <label htmlFor="password">Old Password</label>
-                <input name="oldPassword" id="password" type="password" placeholder="Old Password" required />
+    return <Navigate to="/login" />;
+  }
 
-                <label htmlFor="newPassword">New Password</label>
-                <input name="newPassword" id="newPassword" type="password" placeholder="New Password must be 8-32 characters and contain 1 uppercase letter, 1 lowercase letter, 1 number, 1 special character and no spaces" required />
+  const usingPasswordProvider = currentUser.providerData[0].providerId === 'password';
 
-                <label htmlFor="confirmNewPassword">Confirm New Password</label>
-                <input name="confirmNewPassword" id="password" type="password" placeholder="Retype New Password" required />
+  return (
+    <Box className="auth-page">
+      <Box className="auth-container">
+        <Paper className="auth-card" elevation={3}>
+          <Box className="auth-header">
+            <Typography variant="h2" fontWeight="bold">
+              🔒 Change Password
+            </Typography>
+            {usingPasswordProvider ? (
+              <Typography variant="body2" color="text.secondary">
+                Keep your account secure with a fresh password
+              </Typography>
+            ) : null}
+          </Box>
 
-                {error && <p className='auth-error'>{error}</p>}
-                <div className="btn-shelf">
-                <button className="auth-btn" name="submit-btn" type="submit">Change Password</button>
-                </div>
-            </form>
-        </>
-    );
-}
+          <Divider className="auth-divider-spaced" />
+
+          {!usingPasswordProvider ? (
+            <Alert severity="info">
+              You are currently signed in using {currentUser.providerData[0].providerId}.
+              Please change your password there.
+            </Alert>
+          ) : (
+            <Box component="form" onSubmit={handleChangePassword} noValidate>
+              <Box className="auth-form-fields">
+                <TextField
+                  name="oldPassword"
+                  id="oldPassword"
+                  type="password"
+                  label="Old Password"
+                  fullWidth
+                  required
+                />
+                <TextField
+                  name="newPassword"
+                  id="newPassword"
+                  type="password"
+                  label="New Password"
+                  helperText="8-32 chars · 1 uppercase · 1 lowercase · 1 number · 1 special · no spaces"
+                  fullWidth
+                  required
+                />
+                <TextField
+                  name="confirmNewPassword"
+                  id="confirmNewPassword"
+                  type="password"
+                  label="Confirm New Password"
+                  placeholder="Retype new password"
+                  fullWidth
+                  required
+                />
+
+                {error && <Alert severity="error">{String(error)}</Alert>}
+                {info && <Alert severity="success">{info}</Alert>}
+
+                <Button type="submit" variant="contained" size="large" fullWidth>
+                  Change Password
+                </Button>
+              </Box>
+            </Box>
+          )}
+        </Paper>
+      </Box>
+    </Box>
+  );
 }
 
 export default ChangePassword;
