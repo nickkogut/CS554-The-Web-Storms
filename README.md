@@ -9,24 +9,17 @@
 | Thomas Vella              | 20024933 |
 | Kartik Pantula            | 20029941 |
 
-
-## Overview
-TODO
-# Quiz Catalog
-
-# Running Quizzes
-
-# User/Friend Features
-
-# Additional Notes
-
-
 # Getting Started
 ## Initial Setup
 Please start a docker engine (i.e. Docker Desktop) \
 ```npm i```\
 ```npm run docker:dev``` 
 - This initializes Redis, RabbitMQ, and Mongo servers and enable them to communicate with the server and each other. This also starts the server.
+- Once you see the following in the terminal, the application is live
+```backend-1   | Connected to RabbitMQ```
+```backend-1   | RabbitMQ connected```
+```backend-1   | 🚀 Socket.io ready on port 4001```
+```backend-1   | 🚀 GraphQL ready at: http://localhost:4000/```
 ```npm run seed``` *Note: if you create an account prior to this you will need to re-login* \
 ```https://localhost:5173/``` \
 ```npm run docker:down```
@@ -47,8 +40,5 @@ We suggest you use multiple browsers or private browsing tabs to sign in with mu
 ```docker compose up``` \
 ```https://localhost:5173/``` \
 ```docker compose down```
-
----
-TODO - what else?
 
 
