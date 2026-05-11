@@ -284,7 +284,7 @@ export default function ModeratorPage() {
                             );
                             return;
                         }
-
+                        sessionStorage.setItem('hostedRoomId', response.roomId);
                         navigate(`/host-room/${response.roomId}`);
                         enqueueSnackbar(
                             `Session started. Code: ${response.roomId}`,
